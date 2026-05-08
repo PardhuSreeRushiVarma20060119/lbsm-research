@@ -1,4 +1,4 @@
-![lsbm](arts/lsbm.png)
+
 
 ### Temporal & Adaptive Dynamics of Latent Behavioral Structure in Low-Dimensional Statistical Manifolds (LBSM)
 
