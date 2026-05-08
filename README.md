@@ -28,5 +28,54 @@ LBSM studies:
 - whether behavioral drift manifests as manifold displacement
 - whether temporal behavioral evolution admits compact statistical representations
 
-## Status 
-- ![Notebook01](notebooks/)
+---
+
+## Status
+
+<div align="center">
+
+<i>Current experimental artifacts, telemetry outputs, and research notebooks.</i>
+
+<br>
+
+<table>
+<tr>
+
+<td width="50%" valign="top">
+
+<h3 align="center">📓 Notebook01</h3>
+
+<p align="left">
+Telemetry generation pipeline, latent behavioral regime synthesis, and adaptive signal experiments.
+</p>
+
+<p align="center">
+<a href="notebooks/01_telemetry_generation.ipynb">
+<img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge">
+</a>
+</p>
+
+</td>
+
+<td width="50%" valign="top">
+
+<h3 align="center">🗂️ Telemetry Dataset</h3>
+
+<p align="left">
+Generated behavioral telemetry dataset with multi-agent temporal traces (<code>n=20</code>, <code>t=2000</code>)
+</p>
+
+<p align="center">
+<a href="data/telemetry_n20_t2000.csv">
+<img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge">
+</a>
+</p>
+
+</td>
+
+</tr>
+</table>
+
+</div>
+
+---
