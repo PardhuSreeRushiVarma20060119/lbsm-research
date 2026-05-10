@@ -34,26 +34,37 @@ LBSM studies:
 
 > Current experimental artifacts, telemetry outputs, and generated research assets.
 
-#### 📓 Notebook01
+#### 📓 Notebooks
 
-Telemetry generation pipeline, latent behavioral regime synthesis,  
-and adaptive signal synthesis experiments.
-
+- Notebook-01 : 
 <p>
   <a href="notebooks/01_telemetry_generation.ipynb">
     <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
   </a>
 </p>
 
+- Notebook-02 :
+<p>
+  <a href="notebooks/02_manifold_learning.ipynb">
+    <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
+  </a>
+</p>
+
 #### 🗂️ Telemetry Dataset
 
-Generated multi-agent telemetry traces and behavioral outputs  
-for experimental analysis.
-
-`n = 20 agents` • `t = 2000 timesteps`
-
+- t2000 dataset (nb01) :
 <p>
-  <a href="data/telemetry_n20_t2000.csv">
+  <a href="data/processed/nb01/telemetry_n20_t2000.csv">
+    <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+  </a>
+</p>
+
+- trajectory & transistion coords dataset (nb02) :
+<p>
+  <a href="data/processed/nb01/trajectory_stats.csv">
+    <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+  </a>
+  <a href="data/processed/nb02/transistion_coords.csv">
     <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
   </a>
 </p>
