@@ -26,6 +26,7 @@
             python312Packages.plotly
             python312Packages.notebook
             python312Packages.ipykernel
+            python312Packages.umap-learn
           ];
 
           shellHook = ''
