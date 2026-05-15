@@ -1,1 +1,1 @@
-this is a obsidian notes. for better readability, view in obsidian.
+ **this is a obsidian notes. for better readability, view in obsidian.**
