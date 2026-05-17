@@ -80,7 +80,7 @@ def extract_agent_trajectories(
     Returns
     -------
     trajectories : dict  agent_id → np.ndarray shape (T, 2)
-                   sorted by timestep for each agent
+    sorted by timestep for each agent
     """
     df = df_full.copy()
     df["_emb_x"] = embedding[:, 0]
