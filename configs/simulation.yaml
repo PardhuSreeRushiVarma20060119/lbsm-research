@@ -1,0 +1,5 @@
+n_agents: 20
+n_timesteps: 2000
+initial_states: [stable, exploratory, adaptive, unstable]
+transition_matrix: null # Use DEFAULT_TRANSITION_MATRIX
+random_seed: 42

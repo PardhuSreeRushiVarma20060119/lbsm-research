@@ -1,0 +1,6 @@
+preprocessing:
+  remove_outliers: true
+  outlier_threshold: 3 # sigma units
+normalization:
+  method: zscore
+  feature_ranges: null
