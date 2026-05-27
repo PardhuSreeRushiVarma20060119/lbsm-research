@@ -26,6 +26,7 @@
      - Parallel analysis branches (HMM, Drift, RL)
      - Data structures illustration
    - **Best for**: Understanding system structure, data dependencies
+   - for mermaid representations : [ARCHITECTURE_DIAGRAM](./ARCHITECTURE_DIAGRAM-mermaid.md)
 
 ### 3. **[MODULE_REFERENCE](./MODULE_REFERENCE.md)** (18.3 KB)
    - **Detailed function catalog** for every module:
