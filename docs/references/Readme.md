@@ -1,8 +1,6 @@
-# LBSM Codebase Understanding - Quick Reference Index
+# LBSM Research Ref - Quick Reference Index
 
-## 📚 Documentation Files Created
-
-This session has generated comprehensive documentation about the LBSM research codebase:
+## 📚 Documentation Files In This Directory :
 
 ### 1. **[CODEBASE_UNDERSTANDING](./CODEBASE_UNDERSTANDING.md)** (13.3 KB)
    - **Overview**: Project vision, architecture, research hypothesis
@@ -211,28 +209,7 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 
 ---
 
-## 🔍 How to Explore Further
-
-### To understand **simulation**:
-→ Read `src/simulation/agent.py` (AdaptiveAgent class)
-→ Check `src/simulation/behavior_profiles.py` (regime definitions)
-
-### To understand **manifold learning**:
-→ Read `src/manifold/pca.py` (linear baseline)
-→ Read `src/manifold/umap_projection.py` (primary method)
-
-### To understand **evaluation**:
-→ Read `src/manifold/manifold_metrics.py` (quality scorecard)
-→ Check code patterns in CODE_PATTERNS_DETAILS.md
-
-### To understand **research**:
-→ Read Notebook 01 (telemetry generation)
-→ Read Notebook 02 (manifold learning)
-→ Check docs/obsidian-notes/ (research notes)
-
----
-
-## 📍 File Locations
+## 📍 File System
 
 ```
 lbsm-research/
@@ -304,7 +281,7 @@ lbsm-research/
 
 ---
 
-## ⚠️ Known Limitations & Future Work
+##  📋 Ongoing Work
 
 ### Code Status
 - ✅ Simulation: Production-ready
@@ -320,42 +297,8 @@ lbsm-research/
 
 ### Analysis Depth
 - Visual manifold quality: ✅ Complete
-- Statistical validation: ⚠️ Limited (needs more rigor)
+- Statistical validation: ⚠️ Limited (needs more rigor - ongoing)
 - Temporal dynamics: 📋 Planned (drift detection)
 - Adaptive learning: 📋 Planned (RL integration)
-
----
-
-## 🤝 Contributing Notes
-
-For future work on this codebase:
-
-1. **Maintain patterns**: Use frozen dataclasses, factory functions, result containers
-2. **Document thoroughly**: NumPy-style docstrings with paper references
-3. **Test rigorously**: Validate mathematically, check with known datasets
-4. **Reproducible**: Always set random seeds
-5. **Type hints**: Maintain full type annotations
-6. **No edits yet**: This is exploration only (as per initial request)
-
----
-
-## 📝 Session Summary
-
-**Task**: Understand the LBSM research codebase fully without making edits.
-
-**Deliverables**:
-- ✅ CODEBASE_UNDERSTANDING.md — Project overview & architecture
-- ✅ ARCHITECTURE_DIAGRAM.md — System structure & data flow
-- ✅ MODULE_REFERENCE.md — Detailed function catalog
-- ✅ CODE_PATTERNS_DETAILS.md — Implementation patterns & concepts
-- ✅ This Quick Reference Index
-
-**Total Documentation**: ~62 KB across 5 files
-
-**Coverage**:
-- 100% of implemented modules (51 Python files)
-- 100% of major classes (4+ key classes documented)
-- 100% of core workflows (simulation → analysis → visualization)
-- 100% of research concepts (manifold hypothesis, metrics, etc.)
 
 ---
