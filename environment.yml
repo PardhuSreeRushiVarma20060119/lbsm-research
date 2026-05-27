@@ -1,0 +1,21 @@
+# Compatibility environment for non-Nix users.
+# Canonical environment definition lives in flake.nix.
+
+name: lbsm
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jupyterlab
+  - plotly
+  - notebook
+  - ipykernel
+  - umap-learn

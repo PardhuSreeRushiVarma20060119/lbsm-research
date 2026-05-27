@@ -1,0 +1,13 @@
+[project]
+name = "lbsm"
+version = "0.1.0"
+description = "Latent Behavioral State Machines research framework"
+readme = "README.md"
+requires-python = ">=3.12"
+
+authors = [
+  { name = "PardhuVarma" }
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
