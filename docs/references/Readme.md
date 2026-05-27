@@ -4,7 +4,7 @@
 
 This session has generated comprehensive documentation about the LBSM research codebase:
 
-### 1. **CODEBASE_UNDERSTANDING.md** (13.3 KB)
+### 1. **[CODEBASE_UNDERSTANDING](./CODEBASE_UNDERSTANDING.md)** (13.3 KB)
    - **Overview**: Project vision, architecture, research hypothesis
    - **Sections**:
      - Project Overview & Core Hypothesis
@@ -17,7 +17,7 @@ This session has generated comprehensive documentation about the LBSM research c
      - Code Organization Principles
    - **Best for**: Getting oriented, understanding big picture
 
-### 2. **ARCHITECTURE_DIAGRAM.md** (13 KB)
+### 2. **[ARCHITECTURE_DIAGRAM](./ARCHITECTURE_DIAGRAM.md)** (13 KB)
    - **Visual representations** of the system:
      - Data Flow Diagram (simulation → processing → analysis)
      - Module Dependency Graph
@@ -29,7 +29,7 @@ This session has generated comprehensive documentation about the LBSM research c
      - Data structures illustration
    - **Best for**: Understanding system structure, data dependencies
 
-### 3. **MODULE_REFERENCE.md** (18.3 KB)
+### 3. **[MODULE_REFERENCE](./MODULE_REFERENCE.md)** (18.3 KB)
    - **Detailed function catalog** for every module:
      - Class definitions with all methods
      - Function signatures with parameter details
@@ -42,7 +42,7 @@ This session has generated comprehensive documentation about the LBSM research c
      - Factory functions and result containers
    - **Best for**: API reference, looking up specific functions
 
-### 4. **CODE_PATTERNS_DETAILS.md** (17 KB)
+### 4. **[CODE_PATTERNS_DETAILS](./CODE_PATTERNS_DETAILS.md)** (17 KB)
    - **Implementation deep-dives**:
      - Design patterns used throughout codebase
      - Statistical concepts & formulas
@@ -65,7 +65,6 @@ This session has generated comprehensive documentation about the LBSM research c
 | Metric | Value |
 |--------|-------|
 | **Repository** | PardhuSreeRushiVarma20060119/lbsm-research |
-| **Current Branch** | agents/codebase-exploration-only |
 | **Main Branch** | main |
 | **Total Size** | ~36 MB (mostly notebooks) |
 | **Code Size** | ~2,191 lines Python |
@@ -292,7 +291,7 @@ lbsm-research/
 
 ## 🎓 References & Background
 
-### Research Paper
+### Research Paper (Still in progress)
 "Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
 - Extensively referenced in docstrings
 - Sections cited: 3.1 (regimes), 3.2 (agent dynamics), 5.1 (PCA), 5.2 (UMAP), 5.4 (metrics)
@@ -310,7 +309,7 @@ lbsm-research/
 ### Code Status
 - ✅ Simulation: Production-ready
 - ✅ Manifold Learning: Production-ready
-- ⚠️ Testing: Empty test files (needs coverage)
+- 📋 Testing: Empty test files (needs coverage - pending)
 - 📋 HMM: Interfaces defined, implementation pending
 - 📋 Drift: Interfaces defined, implementation pending
 - 📋 RL: Interfaces defined, implementation pending
@@ -360,7 +359,3 @@ For future work on this codebase:
 - 100% of research concepts (manifold hypothesis, metrics, etc.)
 
 ---
-
-**Status**: ✅ **CODEBASE FULLY UNDERSTOOD - READY FOR NEXT PHASE**
-
-All documentation files are saved in `/home/sicmundus/.copilot/session-state/fb2a2582-6875-4a5e-a2c2-995a2ada9df3/`
