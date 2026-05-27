@@ -356,7 +356,6 @@ Infrastructure and helpers.
 ## Repository Metadata
 
 - **Main branch**: `main`
-- **Current branch**: `agents/codebase-exploration-only`
 - **Remote**: `origin` → GitHub SSH
 - **Git history**: 20+ commits with gradual development
 - **License**: File present but empty (check Git)
