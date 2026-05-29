@@ -10,3 +10,4 @@ plotly
 notebook
 ipykernel
 umap-learn
+hmmlearn

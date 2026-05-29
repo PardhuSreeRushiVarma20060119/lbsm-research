@@ -32,6 +32,7 @@
               python312Packages.notebook
               python312Packages.ipykernel
               python312Packages.umap-learn
+              python312Packages.hmmlearn
             ];
 
             shellHook = ''
@@ -50,6 +51,7 @@
               echo "notebook" >> requirements.txt
               echo "ipykernel" >> requirements.txt
               echo "umap-learn" >> requirements.txt
+              echo "hmmlearn" >> requirements.txt
               echo "✓ requirements.txt synced with Nix flake packages."
             '';
           };
