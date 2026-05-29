@@ -50,6 +50,13 @@ LBSM studies:
   </a>
 </p>
 
+- Notebook-03 :
+<p>
+  <a href="notebooks/03_hmm_inference.ipynb">
+    <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
+  </a>
+</p>
+
 #### 🗂️ Telemetry Dataset
 
 - t2000 dataset (nb01) :
@@ -61,10 +68,20 @@ LBSM studies:
 
 - trajectory & transistion coords dataset (nb02) :
 <p>
-  <a href="data/processed/nb01/trajectory_stats.csv">
+  <a href="data/processed/nb02/trajectory_stats.csv">
     <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
   </a>
   <a href="data/processed/nb02/transistion_coords.csv">
+    <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+  </a>
+</p>
+
+- hmm datasets (nb03) :
+  <p>
+  <a href="data/processed/nb03/hmm_agent_metrics.csv">
+    <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+  </a>
+  <a href="data/processed/nb03/hmm_regime_accuracy.csv">
     <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
   </a>
 </p>
