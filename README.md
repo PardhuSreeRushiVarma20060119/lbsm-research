@@ -57,7 +57,7 @@ LBSM studies:
   </a>
 </p>
 
-#### 🗂️ Telemetry Dataset
+#### 🗂️ Datasets
 
 - t2000 dataset (nb01) :
 <p>
