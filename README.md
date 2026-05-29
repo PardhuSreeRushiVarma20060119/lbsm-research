@@ -76,14 +76,14 @@ LBSM studies:
   </a>
 </p>
 
-- hmm datasets (nb03) :
-  <p>
-  <a href="data/processed/nb03/hmm_agent_metrics.csv">
-    <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
-  </a>
-  <a href="data/processed/nb03/hmm_regime_accuracy.csv">
-    <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
-  </a>
+- hmm datasets: metrics and accuracy (nb03) :
+<p>
+<a href="data/processed/nb03/hmm_agent_metrics.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+<a href="data/processed/nb03/hmm_regime_accuracy.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
 </p>
 
 ---
