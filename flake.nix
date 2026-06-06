@@ -66,7 +66,6 @@ notebook
 ipykernel
 umap-learn
 hmmlearn
-sage
 EOF
 
               echo "✓ requirements.txt synced."
