@@ -43,7 +43,7 @@
               python313Packages.umap-learn
               python313Packages.hmmlearn
 
-              # SageMath
+              # SageMath is required for project workflows and notebooks.
               sage
             ];
 
@@ -66,6 +66,8 @@ notebook
 ipykernel
 umap-learn
 hmmlearn
+# NOTE: do not add `sage` here; CI dependency submission validates
+# this list against PyPI, and SageMath is provided via Nix/system.
 EOF
 
               echo "✓ requirements.txt synced."
