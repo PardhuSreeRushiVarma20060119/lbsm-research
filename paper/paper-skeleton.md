@@ -1,7 +1,7 @@
 
 LBSM Sections
 
-* Abstract
+Abstract
 
 1. Introduction : 1.1, 1.2 ... (prolly)
 
@@ -51,7 +51,8 @@ LBSM Sections
 9. Discussion
 10. Conclusion
 
-* References
-* APPENDIX
+References
+
+APPENDIX
 
 
