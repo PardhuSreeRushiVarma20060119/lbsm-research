@@ -13,7 +13,7 @@ of the ``HMMResult`` this function returns.
 Reference
 ---------
 "Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
-Section 6 — Unsupervised Regime Recovery via Hidden Markov Models
+Section 6.1 — Unsupervised Regime Recovery via Hidden Markov Models
 """
 
 from __future__ import annotations
