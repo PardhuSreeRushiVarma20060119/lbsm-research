@@ -1,4 +1,4 @@
-NB02-Report
+NB02-Report : 
 Manifold Learning & Latent Geometric Structures : Nonlinear Projection, Trajectory Analysis & Cross-Method Validation. 
 
 - Central Question: 
