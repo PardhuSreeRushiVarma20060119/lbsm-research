@@ -1,6 +1,6 @@
 NB03-Report : 
 
-HMM Inference & Unsup ervised Regime Recovery : Temporal Sequence Modelling, Viterbi Decoding & Posterior Uncertainty Analysis.
+HMM Inference & Unsupervised Regime Recovery : Temporal Sequence Modelling, Viterbi Decoding & Posterior Uncertainty Analysis.
 
 
 - Central Question: 
