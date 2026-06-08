@@ -5,7 +5,7 @@ LBSM Sections
 
 1. Introduction : 1.1, 1.2 ... (prolly)
 
-2. Related Work : 
+2. Related Work :
 
     Section 2.1 Behavioral Telemetry and Agent Dynamics : Prior work on telemetry generation, behavioral monitoring, adaptive agents, and trajectory analysis.
     Section 2.2 Manifold Learning for High-Dimensional Data : PCA, t-SNE, UMAP, manifold hypothesis, nonlinear representation of complex behaviors. 
