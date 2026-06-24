@@ -1,0 +1,13 @@
+phase,regime,dwell
+early,stable,0.40755555555555556
+early,exploratory,0.22933333333333333
+early,adaptive,0.21533333333333332
+early,unstable,0.14777777777777779
+mid,stable,0.44872727272727275
+mid,exploratory,0.2101818181818182
+mid,adaptive,0.19636363636363635
+mid,unstable,0.14472727272727273
+late,stable,0.4398
+late,exploratory,0.2114
+late,adaptive,0.2028
+late,unstable,0.146
