@@ -16,6 +16,7 @@
 │                          └─→ reset() ──→ Clean slate                   │
 │                                                                          │
 │   Factory: make_agent() / make_agent_pool()                             │
+│   Orchestrator: TelemetryGenerator (.run/.save/.load)                   │
 │                                                                          │
 └────────────┬────────────────────────────────────────────────────────────┘
              │
@@ -26,8 +27,10 @@
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  preprocessing.py  ──→  normalization.py  ──→  feature_extraction.py  │
-│  (Remove nulls,         (Z-score)               (Derive features)      │
-│   outliers)             windowing.py            statistics.py          │
+│  (clip_features,        (zscore/minmax)         (rolling stats,        │
+│   drop_incomplete,      windowing.py            temporal_diff,         │
+│   temporal split)       (sliding windows)       composite_health)      │
+│                         statistics.py (regime_summary, Fisher sep.)    │
 │                                                                          │
 └────────────┬────────────────────────────────────────────────────────────┘
              │
@@ -53,72 +56,99 @@
 │  └──────────────────┘  UMAPResult(embedding, n_neighbors, min_dist)   │
 │         │                                                               │
 │         ├─ hyperparameter_sweep() ──→ Grid search + Silhouette scores │
-│         ├─ umap_per_regime_density() ──→ Regime KDE estimates        │
+│         ├─ per_regime_density() ──→ Regime KDE estimates              │
 │         └─ regime_connectivity() ──→ Boundary porosity metrics         │
 │                                                                          │
 │  ┌─ fit_tsne() ──────┐                                                  │
-│  │ (Alternative)     │                                                  │
-│  └──────────────────┘  (Similar interface)                             │
+│  │ (Alternative,     │                                                  │
+│  │  stratified       │                                                  │
+│  │  subsample)       │  TSNEResult(embedding, perplexity, kl_div)     │
+│  └──────────────────┘                                                  │
+│                                                                          │
+│  trajectory_geometry.py ──→ TrajectoryStats per agent (path_length,   │
+│                              tortuosity, mean_speed, n_transitions)    │
+│  covariance_analysis.py ──→ EMPTY FILE (no implementation)             │
 │                                                                          │
 └────────────┬────────────────────────────────────────────────────────────┘
              │
              ├─────────────────────────────────────────┐
              ↓ (2D/3D embeddings with labels)         ↓ (Original X + embedded X)
 ┌─────────────────────────────────────────────────┐  ┌──────────────────────┐
-│      VISUALIZATION LAYER                        │  │  EVALUATION LAYER    │
+│      VISUALIZATION LAYER — mostly empty         │  │  EVALUATION LAYER    │
 ├─────────────────────────────────────────────────┤  ├──────────────────────┤
 │                                                 │  │                      │
-│ manifold_plots.py  ──→ 2D/3D scatterplots     │  │ embedding_scorecard()│
-│ trajectory_plots.py ──→ Trajectories           │  │ ├─ silhouette       │
-│ heatmaps.py ──→ Transition matrices            │  │ ├─ davies_bouldin   │
-│ temporal_dynamics.py ──→ Time series           │  │ ├─ calinski_harabasz│
-│ state_transitions.py ──→ Regime flows          │  │ ├─ trustworthiness  │
-│ dashboard.py ──→ Multi-panel views             │  │ └─ continuity       │
-│                                                 │  │                      │
-│ (Jupyter + matplotlib/plotly)                  │  │ → Comparison table  │
-│                                                 │  │    (PCA vs UMAP)    │
+│ manifold_plots.py — one-off script:            │  │ embedding_scorecard()│
+│   hardcoded paths, writes lbsm_umap3d.html     │  │ ├─ silhouette       │
+│   on import (not a reusable function library)  │  │ ├─ davies_bouldin   │
+│                                                 │  │ ├─ calinski_harabasz│
+│ trajectory_plots.py, heatmaps.py,              │  │ ├─ trustworthiness  │
+│ temporal_dynamics.py, state_transitions.py,    │  │ └─ continuity       │
+│ dashboard.py  ──→ EMPTY FILES                  │  │                      │
+│                                                 │  │ clustering_metrics, │
+│ (actual plotting happens inline in notebooks,  │  │ manifold_quality,   │
+│  matplotlib/seaborn/plotly)                    │  │ stability_metrics,  │
+│                                                 │  │ trajectory_metrics  │
 └─────────────────────────────────────────────────┘  └──────────────────────┘
              ↑
-             └─ Notebooks 01-02: Research pipeline
+             └─ Notebooks 01-05: Research pipeline (06-07 empty, not started)
 
 
-PARALLEL ANALYSIS BRANCHES
-──────────────────────────
+PARALLEL ANALYSIS BRANCHES — all implemented
+─────────────────────────────────────────────
 
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                           HMM LAYER (Planned)                            │
-│          (Infer hidden state sequence from observed telemetry)          │
+│                              HMM LAYER                                    │
+│          (Infer hidden state sequence from observed telemetry,          │
+│           purely unsupervised — GT used only for evaluation)            │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  hidden_state_model.py ──→ Forward/Backward/Viterbi algorithms        │
-│  sequence_inference.py ──→ State recovery                              │
-│  transition_analysis.py ──→ Empirical transition matrix recovery       │
-│  latent_state_metrics.py ──→ State-space diagnostics                   │
+│  hidden_state_model.py ──→ fit_hmm(): Gaussian HMM, Baum-Welch/EM,     │
+│                             Viterbi decode → HMMResult (ARI, accuracy,  │
+│                             confusion matrix, Hungarian-aligned mapping)│
+│  sequence_inference.py ──→ model_selection_sweep() (BIC/AIC over       │
+│                             n_components), stationary_distribution()   │
+│  transition_analysis.py ──→ transition_matrix_error(), spectral_gap(), │
+│                              expected_dwell_times()                    │
+│  latent_state_metrics.py ──→ per_regime_accuracy(), per_agent_metrics()│
+│                               (Hungarian-aligned), posterior_entropy()  │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                          DRIFT LAYER (Planned)                           │
-│        (Detect behavioral regime shifts over time)                      │
+│                             DRIFT LAYER                                   │
+│    (Three independent detectors + regime-shift characterization,        │
+│     evaluated against HMM-decoded ground-truth changepoints)            │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  drift_detection.py ──→ Primary detection algorithms                   │
-│  regime_shift_analysis.py ──→ Characterize shift events                │
-│  kl_divergence.py ──→ KL divergence-based metrics                      │
-│  ewma.py ──→ Exponentially weighted moving average tracking            │
+│  drift_detection.py ──→ fit_healthy_envelope() + fit_mahalanobis()     │
+│                          (Gaussian-envelope distance) +                │
+│                          combined_anomaly_score() (fuses Mah. + EWMA)  │
+│  ewma.py ──→ fit_ewma() — adaptive-threshold EWMA residual scoring     │
+│  kl_divergence.py ──→ fit_kl_detector() — sliding-window KL vs.        │
+│                        reference distribution                          │
+│  regime_shift_analysis.py ──→ ground_truth_changepoints(),             │
+│                                detection_latency(), shift_magnitude()  │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                           RL LAYER (Planned)                             │
-│        (Adaptive behavioral evolution through learning)                 │
+│                               RL LAYER                                    │
+│    (Tabular Q-learning over a discretized behavioral MDP; maps         │
+│     training dynamics back onto manifold/HMM/drift geometry)           │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  q_learning.py ──→ Q-learning policy optimization                      │
-│  policy.py ──→ Policy abstraction layer                                │
-│  exploration.py ──→ Exploration strategies (ε-greedy, softmax, etc.)   │
-│  reward_tracking.py ──→ Cumulative rewards and learning curves         │
-│  adaptation_dynamics.py ──→ How learning maps to manifold geometry    │
+│  environment.py ──→ BehavioralEnv: MDP over (latency, entropy) grid,   │
+│                      actions nudge the agent's transition-matrix row   │
+│  q_learning.py ──→ QLearningAgent.train() (ε-greedy tabular Q-learning)│
+│  exploration.py ──→ EpsilonSchedule, CuriosityBonus (count-based)      │
+│  reward_dynamics.py ──→ ManifoldPotential (potential-based shaping),   │
+│                          RewardCurriculum (ramped unstable penalty)    │
+│  reward_tracking.py ──→ learning_curve_df(), convergence_table(),     │
+│                          dwell_evolution_df()                          │
+│  adaptation_dynamics.py ──→ manifold_trajectory_stats(),               │
+│                              cluster_migration_table(),                │
+│                              transition_entropy_series()                │
+│  policy.py ──→ greedy_policy(), policy_entropy(), action_state_heatmap()│
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 
@@ -134,135 +164,111 @@ AdaptiveAgent:
   - _prev_telemetry: np.ndarray (for AR-1 correlation)
 
 BehaviorProfile:
-  - name: str
-  - means: np.ndarray (6 features)
-  - stds: np.ndarray (6 features)
-  - autocorr: float (AR-1 coefficient)
-  - description: str
-  - color: str
+  - name, means (6), stds (6), autocorr, description, color
 
-PCAResult:
-  - embedding: np.ndarray (N, n_components)
-  - explained_var: np.ndarray
-  - cumulative_var: np.ndarray
-  - loadings: pd.DataFrame (feature × PC loadings)
-  - pca_model: sklearn.PCA
-  - n_components_90: int
+PCAResult / UMAPResult / TSNEResult:
+  - embedding: np.ndarray
+  - method-specific fitted model / hyperparameters
 
-UMAPResult:
-  - embedding: np.ndarray (N, n_components)
-  - n_neighbors: int
-  - min_dist: float
-  - n_components: int
-  - reducer: umap.UMAP
+HMMResult:
+  - model, pred_raw, pred_aligned, posteriors_all
+  - mapping: Dict[int,int] (Hungarian-aligned label mapping)
+  - ari, accuracy, log_likelihood, confusion, convergence_ll, n_iter_actual
+
+HealthyEnvelope / MahalanobisResult:
+  - mu, cov_inv, cov, regime_params  /  scores, flags, threshold
+
+EWMAResult / KLDriftResult:
+  - scores, threshold, alpha  /  kl_scores, t_starts, flags, window_size
+
+QLearningConfig / EpisodeStats:
+  - alpha, gamma, epsilon_start/end/decay, n_episodes, seed
+  - episode, total_reward, regime_fractions, mean_mah_score, epsilon, n_steps
+
+BehavioralEnv:
+  - discretized (latency, entropy) state grid; .step()/.reset()/.trajectory()
 
 
-EXPERIMENT PIPELINE
-───────────────────
+EXPERIMENT PIPELINE — placeholder scripts, currently EMPTY
+────────────────────────────────────────────────────────────
 
-experiments/baseline/run_baseline.py
-  └─→ Generate agents → Simulate telemetry → Save CSV
+experiments/baseline/run_baseline.py           → 0 lines
+experiments/manifold/run_projection_experiment.py → 0 lines
+experiments/drift/run_drift_experiment.py      → 0 lines
+experiments/rl_adaptive/run_rl_experiment.py   → 0 lines
 
-experiments/manifold/run_projection_experiment.py
-  └─→ Load telemetry → PCA/UMAP/t-SNE → Evaluate metrics → Visualize
-
-experiments/drift/run_drift_experiment.py
-  └─→ Detect regime shifts → Analyze drift characteristics
-
-experiments/rl_adaptive/run_rl_experiment.py
-  └─→ Agent learning → Track manifold trajectory → Measure adaptation
+Each has a populated sibling config.yaml, but nothing reads it yet.
+The real pipelines run inside notebooks 01–05, not these scripts.
 
 
 JUPYTER NOTEBOOKS (Active Research Documents)
 ──────────────────────────────────────────────
 
-01_telemetry_generation.ipynb
+01_telemetry_generation.ipynb (populated)
    └─ Simulation → Telemetry generation → State dynamics visualization
 
-02_manifold_learning.ipynb
+02_manifold_learning.ipynb (populated)
    └─ PCA/UMAP/t-SNE comparison → Manifold quality metrics → Interpretation
 
-03_hmm_inference.ipynb (Planned)
-   └─ State sequence recovery → Viterbi decoding
+03_hmm_inference.ipynb (populated)
+   └─ Gaussian HMM (Baum-Welch/Viterbi) → BIC model selection → GT comparison
 
-04_anomaly_detection.ipynb (Planned)
-   └─ Outlier detection in manifold space
+04_anomaly_detection.ipynb (populated)
+   └─ EWMA / KL / Mahalanobis detectors → threshold sweeps → detection latency
 
-05_rl_behavioral_evolution.ipynb (Planned)
-   └─ Learning trajectories → Adaptation dynamics
+05_rl_behavioral_evolution.ipynb (populated)
+   └─ Q-learning over BehavioralEnv → learning curves → manifold/cluster migration
 
-06_manifold_visualization.ipynb (Planned)
-   └─ 3D interactive visualizations
+06_manifold_visualization.ipynb (EMPTY — not started)
+   └─ Planned: 3D interactive visualizations
 
-07_final_experiment_analysis.ipynb (Planned)
-   └─ Integrated cross-pipeline analysis
+07_final_experiment_analysis.ipynb (EMPTY — not started)
+   └─ Planned: integrated cross-pipeline analysis
 ```
 
 ## Module Dependency Graph
 
 ```
 src/
-├── simulation/          ← Foundation (generates data)
+├── simulation/          ← Foundation (generates data) — IMPLEMENTED
 │   ├── agent.py ◄─────── BehaviorProfile, telemetry generation
 │   ├── behavior_profiles.py
-│   ├── environment.py
-│   ├── reward_dynamics.py
-│   └── telemetry_generator.py
+│   ├── telemetry_generator.py
+│   ├── environment.py, reward_dynamics.py  (thin/unused here — see rl/)
 │
-├── telemetry/           ← Data pipeline
-│   ├── preprocessing.py
-│   ├── normalization.py
-│   ├── feature_extraction.py
-│   ├── statistics.py
-│   └── windowing.py
+├── telemetry/           ← Data pipeline — IMPLEMENTED
+│   ├── preprocessing.py, normalization.py, feature_extraction.py
+│   ├── statistics.py, windowing.py
 │
-├── manifold/            ← Primary analysis
+├── manifold/            ← Primary analysis — IMPLEMENTED
 │   ├── pca.py ◄───────── Core linear embedding
 │   ├── umap_projection.py ◄───── Primary nonlinear embedding
-│   ├── tsne.py
-│   ├── manifold_metrics.py
-│   ├── trajectory_geometry.py
-│   └── covariance_analysis.py
+│   ├── tsne.py, manifold_metrics.py, trajectory_geometry.py
+│   ├── covariance_analysis.py  — EMPTY
 │
-├── evaluation/          ← Quantitative validation
-│   ├── manifold_quality.py
-│   ├── clustering_metrics.py
-│   ├── trajectory_metrics.py
-│   ├── stability_metrics.py
-│   └── explained_variance.py
+├── hmm/                 ← State inference — IMPLEMENTED
+│   ├── hidden_state_model.py, sequence_inference.py
+│   ├── transition_analysis.py, latent_state_metrics.py
 │
-├── visualization/       ← Presentation
-│   ├── manifold_plots.py
-│   ├── trajectory_plots.py
-│   ├── heatmaps.py
-│   ├── temporal_dynamics.py
-│   ├── state_transitions.py
-│   └── dashboard.py
-│
-├── hmm/                 ← State inference (Planned)
-│   ├── hidden_state_model.py
-│   ├── sequence_inference.py
-│   ├── transition_analysis.py
-│   └── latent_state_metrics.py
-│
-├── drift/               ← Anomaly detection (Planned)
-│   ├── drift_detection.py
+├── drift/               ← Anomaly / regime-shift detection — IMPLEMENTED
+│   ├── drift_detection.py, ewma.py, kl_divergence.py
 │   ├── regime_shift_analysis.py
-│   ├── kl_divergence.py
-│   └── ewma.py
 │
-├── rl/                  ← Learning dynamics (Planned)
-│   ├── q_learning.py
-│   ├── policy.py
-│   ├── exploration.py
-│   ├── reward_tracking.py
-│   └── adaptation_dynamics.py
+├── rl/                  ← Learning dynamics — IMPLEMENTED
+│   ├── environment.py, q_learning.py, policy.py, exploration.py
+│   ├── reward_dynamics.py, reward_tracking.py, adaptation_dynamics.py
 │
-└── utils/               ← Infrastructure
-    ├── logging_utils.py
-    ├── experiment_tracking.py
-    ├── io.py
-    └── random_seed.py
+├── evaluation/          ← Quantitative validation — IMPLEMENTED
+│   ├── manifold_quality.py, clustering_metrics.py
+│   ├── trajectory_metrics.py, stability_metrics.py, explained_variance.py
+│
+├── visualization/       ← Presentation — MOSTLY EMPTY
+│   ├── manifold_plots.py  (one-off script, not a library)
+│   ├── trajectory_plots.py, heatmaps.py, temporal_dynamics.py,
+│   │   state_transitions.py, dashboard.py  — all EMPTY
+│
+└── utils/               ← Infrastructure — ALL EMPTY
+    ├── logging_utils.py, experiment_tracking.py, io.py, random_seed.py
 ```
 
 ## Temporal Execution Flow
@@ -277,15 +283,30 @@ Simulation Epoch (each agent, each timestep):
 
 Analysis Pipeline (after simulation):
   1. Collect all telemetry records → Feature matrix X (N×6)
-  2. Preprocess: normalize, handle missing data
+  2. Preprocess: normalize, handle missing data, window
   3. Fit embeddings: PCA, UMAP, t-SNE
   4. Evaluate: Silhouette, Davies-Bouldin, Trustworthiness, etc.
-  5. Visualize: 2D/3D scatter, trajectories, heatmaps
-  6. Interpret: Manifold structure encodes behavioral regimes
+  5. HMM: recover hidden state sequence, compare to ground truth
+  6. Drift: score every timestep/window with EWMA + KL + Mahalanobis,
+     compare flagged points to HMM-derived changepoints
+  7. RL: train Q-learning agents in BehavioralEnv, track how training
+     reshapes manifold trajectories, HMM transition entropy, and
+     anomaly scores over episodes
+  8. Visualize / interpret (ad hoc in notebooks — no shared viz module yet)
+```
 
-Optional Downstream (Planned):
-  - HMM: Infer hidden state sequence from x_t
-  - Drift: Detect regime shifts over time windows
-  - RL: Modify policies, track manifold trajectory
-  - Anomaly: Identify outliers in learned manifold
+## Experiment Pipeline (as scripts — currently unimplemented)
+
+```
+experiments/baseline/run_baseline.py            (0 lines)
+  └─ intended: generate agents → simulate telemetry → save CSV
+
+experiments/manifold/run_projection_experiment.py (0 lines)
+  └─ intended: load telemetry → PCA/UMAP/t-SNE → evaluate metrics → visualize
+
+experiments/drift/run_drift_experiment.py       (0 lines)
+  └─ intended: detect regime shifts → analyze drift characteristics
+
+experiments/rl_adaptive/run_rl_experiment.py    (0 lines)
+  └─ intended: agent learning → track manifold trajectory → measure adaptation
 ```

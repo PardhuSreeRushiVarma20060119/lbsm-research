@@ -2,7 +2,7 @@
 
 ## 📚 Documentation Files In This Directory :
 
-### 1. **[CODEBASE_UNDERSTANDING](./CODEBASE_UNDERSTANDING.md)** (13.3 KB)
+### 1. **[CODEBASE_UNDERSTANDING](./CODEBASE_UNDERSTANDING.md)**
    - **Overview**: Project vision, architecture, research hypothesis
    - **Sections**:
      - Project Overview & Core Hypothesis
@@ -15,63 +15,56 @@
      - Code Organization Principles
    - **Best for**: Getting oriented, understanding big picture
 
-### 2. **[ARCHITECTURE_DIAGRAM](./ARCHITECTURE_DIAGRAM.md)** (13 KB)
+### 2. **[ARCHITECTURE_DIAGRAM](./ARCHITECTURE_DIAGRAM.md)**
    - **Visual representations** of the system:
      - Data Flow Diagram (simulation → processing → analysis)
      - Module Dependency Graph
      - Temporal Execution Flow
      - Experiment Pipeline Overview
    - **Key diagrams**:
-     - End-to-end pipeline (3 main layers)
-     - Parallel analysis branches (HMM, Drift, RL)
+     - End-to-end pipeline (main layers + the hmm/drift/rl branches)
      - Data structures illustration
    - **Best for**: Understanding system structure, data dependencies
-   - for mermaid representations : [ARCHITECTURE_DIAGRAM](./ARCHITECTURE_DIAGRAM-mermaid.md)
+   - for mermaid representations : [ARCHITECTURE_DIAGRAM-mermaid](./ARCHITECTURE_DIAGRAM-mermaid.md)
 
-### 3. **[MODULE_REFERENCE](./MODULE_REFERENCE.md)** (18.3 KB)
+### 3. **[MODULE_REFERENCE](./MODULE_REFERENCE.md)**
    - **Detailed function catalog** for every module:
      - Class definitions with all methods
      - Function signatures with parameter details
      - Return type documentation
-     - Expected functions (not yet implemented)
+     - Which files are real vs. empty stubs
      - Configuration file schemas
-   - **Coverage**:
-     - 9 implemented modules (src/)
-     - 4 planned modules (HMM, Drift, RL, Evaluation)
-     - Factory functions and result containers
+   - **Coverage**: all 9 `src/` packages (55 files; see counts below)
    - **Best for**: API reference, looking up specific functions
 
-### 4. **[CODE_PATTERNS_DETAILS](./CODE_PATTERNS_DETAILS.md)** (17 KB)
+### 4. **[CODE_PATTERNS_DETAILS](./CODE_PATTERNS_DETAILS.md)**
    - **Implementation deep-dives**:
      - Design patterns used throughout codebase
-     - Statistical concepts & formulas
+     - Statistical concepts & formulas (incl. HMM, drift, RL math)
      - Data flow in key functions
      - Error handling & validation
      - Type hints & documentation style
-     - Testing patterns (planned)
-   - **Topics covered**:
-     - Result container pattern (dataclasses)
-     - Factory functions
-     - AR-1 temporal correlation
-     - Hidden state management
-     - Index mapping strategies
+     - Testing patterns (what's real vs. empty)
    - **Best for**: Code style, patterns, implementation details
 
 ---
 
 ## 🎯 Quick Facts
 
+*(counts as of the last doc refresh — re-run the commands in `CODEBASE_UNDERSTANDING.md`'s "How these docs were verified" note if code has moved since)*
+
 | Metric | Value |
 |--------|-------|
 | **Repository** | PardhuSreeRushiVarma20060119/lbsm-research |
 | **Main Branch** | main |
-| **Total Size** | ~36 MB (mostly notebooks) |
-| **Code Size** | ~2,191 lines Python |
-| **Modules** | 51 Python files |
-| **Functions** | ~58 definitions |
-| **Test Files** | 6 (all empty) |
-| **Notebooks** | 7 (2 populated, 5 planned) |
-| **Config Files** | 5 YAML files |
+| **Python files (`src/`)** | 55 (34 non-empty, 21 empty stubs) |
+| **Python LOC (`src/`)** | ~7,500 |
+| **Top-level functions** | ~209 |
+| **Classes / dataclasses** | ~24 |
+| **Test files** | 6 (2 real: `test_simulation.py`, `test_manifold.py`; 4 empty: drift, hmm, metrics, projection, rl) |
+| **Notebooks** | 7 (01–05 populated, 06–07 empty) |
+| **Config Files** | 5 YAML (3 populated: simulation, telemetry, projection; 2 empty: rl, experiments) |
+| **Experiment scripts** | 4 (`experiments/*/run_*.py`, **all currently empty** — 0 lines) |
 
 ---
 
@@ -80,16 +73,21 @@
 ```
 Simulation Layer (agent.py)
         ↓
-Telemetry Processing (preprocessing, normalization)
+Telemetry Processing (preprocessing, normalization, windowing, feature_extraction, statistics)
         ↓
-Manifold Learning (PCA, UMAP, t-SNE)
+Manifold Learning (PCA, UMAP, t-SNE, trajectory_geometry)
         ↓
-┌─────────────────────────────────────┐
-│  Visualization (plots, dashboard)   │
-│  Evaluation (metrics, comparison)   │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│  Evaluation (clustering/trajectory/     │
+│  stability metrics, embedding_scorecard)│
+└─────────────────────────────────────────┘
         ↓
-Parallel Branches (HMM, Drift, RL) — PLANNED
+Parallel Branches — all implemented:
+  hmm/   (state recovery)
+  drift/ (EWMA, KL, Mahalanobis anomaly detection)
+  rl/    (Q-learning behavioral adaptation)
+        ↓
+Visualization — mostly stubs (see status below)
 ```
 
 ---
@@ -100,28 +98,45 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 |-------|--------|---------|
 | `AdaptiveAgent` | simulation/agent.py | Core simulator with hidden Markov chain |
 | `BehaviorProfile` | simulation/behavior_profiles.py | Statistical profile of each regime |
-| `PCAResult` | manifold/pca.py | Container for PCA analysis results |
-| `UMAPResult` | manifold/umap_projection.py | Container for UMAP embedding |
+| `PCAResult` / `UMAPResult` / `TSNEResult` | manifold/*.py | Embedding result containers |
+| `HMMResult` | hmm/hidden_state_model.py | Fitted HMM + decoded states + accuracy |
+| `HealthyEnvelope` / `MahalanobisResult` | drift/drift_detection.py | Gaussian envelope + anomaly scores |
+| `EWMAResult` / `KLDriftResult` | drift/ewma.py, kl_divergence.py | Online drift-detector results |
+| `QLearningAgent` / `QLearningConfig` | rl/q_learning.py | Tabular Q-learning over `BehavioralEnv` |
+| `BehavioralEnv` | rl/environment.py | Discrete-state MDP wrapping agent telemetry |
+| `ManifoldPotential` / `RewardCurriculum` | rl/reward_dynamics.py | Potential-based reward shaping |
 
 ---
 
 ## 🔑 Key Functions by Category
 
 ### Simulation
-- `make_agent()` — Create single agent
-- `make_agent_pool()` — Create multiple agents
-- `AdaptiveAgent.step()` — Run one timestep
-- `AdaptiveAgent.simulate()` — Run n timesteps
+- `make_agent()` / `make_agent_pool()` — create agent(s)
+- `AdaptiveAgent.step()` / `.simulate()` — advance timesteps
 
 ### Manifold Learning
-- `fit_pca()` — PCA embedding
-- `fit_umap()` — UMAP embedding
-- `hyperparameter_sweep()` — Grid search for UMAP
-- `regime_connectivity()` — Boundary porosity metric
+- `fit_pca()`, `fit_umap()`, `fit_tsne()` — embeddings
+- `hyperparameter_sweep()` — UMAP grid search
+- `regime_connectivity()` — boundary porosity metric
+
+### HMM (`src/hmm`)
+- `fit_hmm()` — Baum-Welch EM + Viterbi decode → `HMMResult`
+- `model_selection_sweep()` — BIC/AIC over `n_components`
+- `per_agent_metrics()` — Hungarian-aligned per-agent accuracy
+
+### Drift (`src/drift`)
+- `fit_ewma()`, `fit_kl_detector()`, `fit_mahalanobis()` — three independent detectors
+- `combined_anomaly_score()` — fuses Mahalanobis + EWMA
+- `detection_latency()`, `shift_magnitude()` — evaluate against ground-truth changepoints
+
+### RL (`src/rl`)
+- `QLearningAgent.train()` — tabular Q-learning over `BehavioralEnv`
+- `manifold_trajectory_stats()`, `cluster_migration_table()` — map training onto manifold geometry
 
 ### Evaluation
-- `embedding_scorecard()` — Full quality metrics
-- `compare_embeddings()` — Build comparison table
+- `embedding_scorecard()` — full quality metrics
+- `compare_embeddings()` — comparison table
+- `bootstrap_auc()` / `detector_stability_table()` — drift-detector stability
 
 ---
 
@@ -145,8 +160,7 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 - **Silhouette** [−1, 1]: Cluster separation (↑ better)
 - **Davies-Bouldin** [0, ∞): Cluster compactness (↓ better)
 - **Calinski-Harabasz** [0, ∞): Variance ratio (↑ better)
-- **Trustworthiness** [0, 1]: Neighborhood preservation (↑ better)
-- **Continuity** [0, 1]: Inverse trustworthiness (↑ better)
+- **Trustworthiness / Continuity** [0, 1]: Neighborhood preservation (↑ better)
 
 ---
 
@@ -158,29 +172,26 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 - High manifold quality metrics (silhouette > 0.5, trustworthiness > 0.7)
 - Clear cluster separation (regimes distinguish in embedding)
 - Successful state recovery (HMM inference accuracy)
-- Stable manifold geometry (consistent across methods)
+- RL training trajectories following (or opening new) manifold structure
 
 ---
 
 ## 🚀 Current Status
 
-### ✅ Complete
-- Simulation engine (ground-truth hidden Markov chain)
-- Telemetry generation (6-D feature vectors with AR-1 correlation)
-- Manifold learning (PCA, UMAP, t-SNE implementations)
-- Jupyter notebooks (Nb01: Simulation, Nb02: Manifold Learning)
-- Evaluation metrics (silhouette, Davies-Bouldin, trustworthiness)
+### ✅ Implemented (real code, not stubs)
+- `simulation`, `telemetry`, `manifold`, `hmm`, `drift`, `rl`, `evaluation` — all have working functions
+- Notebooks 01–05 (telemetry generation → manifold learning → HMM inference → anomaly detection → RL evolution)
 
-### 🔄 In Progress
-- Test coverage (empty test files)
-- Documentation completeness
+### 🟡 Stubbed / empty
+- `src/visualization/` — only `manifold_plots.py` has content, and it's a one-off script (hardcoded paths, writes `lbsm_umap3d.html`), not a reusable plotting library
+- `src/utils/` — all four files empty (`io.py`, `logging_utils.py`, `experiment_tracking.py`, `random_seed.py`)
+- `src/manifold/covariance_analysis.py` — empty
+- `experiments/*/run_*.py` — all four scripts are empty (0 lines); the actual pipelines live in the notebooks
+- `configs/rl.yaml`, `configs/experiments.yaml` — empty; RL hyperparameters are defined in code (`QLearningConfig` defaults) instead
+- `tests/test_drift.py`, `test_hmm.py`, `test_metrics.py`, `test_projection.py`, `test_rl.py` — empty placeholders despite the modules they'd cover being implemented
 
-### 📋 Planned
-- HMM inference (recover hidden state sequence)
-- Drift detection (regime shift analysis)
-- RL integration (behavioral adaptation dynamics)
-- Anomaly detection (outliers in manifold)
-- Advanced visualization (3D interactive dashboards)
+### 📋 Not started
+- `notebooks/06_manifold_visualization.ipynb`, `notebooks/07_final_experiment_analysis.ipynb` — 0 bytes
 
 ---
 
@@ -188,11 +199,13 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 
 | Pattern | Usage | Location |
 |---------|-------|----------|
-| **Result Container** | Encapsulate complex outputs | PCAResult, UMAPResult |
-| **Factory Functions** | Simplify object creation | make_agent(), make_agent_pool() |
-| **Index Mapping** | Bidirectional state↔index | _STATE_INDEX, _INDEX_STATE |
-| **Validation** | Fail fast with clear errors | _validate_transition_matrix() |
-| **AR-1 Correlation** | Realistic time series | BehaviorProfile.sample() |
+| **Result Container** | Encapsulate complex outputs | `PCAResult`, `UMAPResult`, `HMMResult`, `EWMAResult`, `KLDriftResult`, `MahalanobisResult` |
+| **Factory Functions** | Simplify object creation | `make_agent()`, `make_agent_pool()`, `make_env_pool()`, `train_agent_pool()` |
+| **Index Mapping** | Bidirectional state↔index | `_STATE_INDEX`, `_INDEX_STATE`, `obs_to_grid()`/`grid_to_coords()` |
+| **Validation** | Fail fast with clear errors | `_validate_transition_matrix()` |
+| **AR-1 Correlation** | Realistic time series | `BehaviorProfile.sample()` |
+| **Curriculum / potential-shaping** | RL reward design | `RewardCurriculum`, `ManifoldPotential` |
+| **Sweep functions** | Hyperparameter search returning a scored DataFrame | `hyperparameter_sweep()`, `model_selection_sweep()`, `alpha_sweep()`, `window_size_sweep()`, `threshold_sweep()` |
 
 ---
 
@@ -203,9 +216,11 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 | **Scientific Computing** | NumPy, SciPy, scikit-learn |
 | **Data** | Pandas |
 | **Manifold Learning** | UMAP-learn, scikit-learn (t-SNE, PCA) |
+| **Sequence Modeling** | hmmlearn (Gaussian HMM, Baum-Welch/Viterbi) |
 | **Visualization** | Matplotlib, Seaborn, Plotly |
 | **Notebooks** | JupyterLab, IPython |
-| **Environment** | Nix (flake.nix for reproducibility) |
+| **Environment** | Nix (`flake.nix`, Python 3.13 + SageMath) / conda (`environment.yml`, Python 3.12) |
+| **Statistics track** | R (`r/statistics`, `r/visualization`, `r/reports` — independent of the Python pipeline) |
 | **Version Control** | Git |
 
 ---
@@ -215,91 +230,63 @@ Parallel Branches (HMM, Drift, RL) — PLANNED
 ```
 lbsm-research/
 ├── src/
-│   ├── simulation/        → Agent & behavior definitions
-│   ├── manifold/         → PCA, UMAP, t-SNE
-│   ├── telemetry/        → Data preprocessing pipeline
-│   ├── evaluation/        → Quality metrics
-│   ├── visualization/     → Plotting & dashboards
-│   ├── hmm/              → HMM inference (planned)
-│   ├── drift/            → Drift detection (planned)
-│   ├── rl/               → RL dynamics (planned)
-│   └── utils/            → Infrastructure
+│   ├── simulation/        → Agent & behavior definitions (implemented)
+│   ├── telemetry/         → Preprocessing, normalization, windowing (implemented)
+│   ├── manifold/          → PCA, UMAP, t-SNE, trajectory geometry (implemented)
+│   ├── hmm/               → Hidden state recovery (implemented)
+│   ├── drift/             → EWMA / KL / Mahalanobis drift detection (implemented)
+│   ├── rl/                → Q-learning + manifold-adaptation analysis (implemented)
+│   ├── evaluation/        → Quality metrics (implemented)
+│   ├── visualization/     → Mostly empty stubs
+│   └── utils/             → All empty stubs
 │
 ├── notebooks/
-│   ├── 01_telemetry_generation.ipynb    (2.5 MB)
-│   ├── 02_manifold_learning.ipynb       (4.1 MB)
-│   ├── 03_hmm_inference.ipynb           (empty)
-│   ├── 04_anomaly_detection.ipynb       (empty)
-│   ├── 05_rl_behavioral_evolution.ipynb (empty)
+│   ├── 01_telemetry_generation.ipynb    (populated)
+│   ├── 02_manifold_learning.ipynb       (populated)
+│   ├── 03_hmm_inference.ipynb           (populated)
+│   ├── 04_anomaly_detection.ipynb       (populated)
+│   ├── 05_rl_behavioral_evolution.ipynb (populated)
 │   ├── 06_manifold_visualization.ipynb  (empty)
 │   └── 07_final_experiment_analysis.ipynb (empty)
 │
-├── experiments/
-│   ├── baseline/         → Baseline simulation run
-│   ├── manifold/         → Manifold learning pipeline
-│   ├── drift/            → Drift detection experiments
-│   └── rl_adaptive/      → RL-driven adaptation
+├── experiments/            → run_*.py scripts, all currently empty
+│   ├── baseline/ manifold/ drift/ rl_adaptive/
 │
 ├── configs/
-│   ├── simulation.yaml
-│   ├── projection.yaml
-│   ├── telemetry.yaml
-│   ├── rl.yaml
-│   └── experiments.yaml
+│   ├── simulation.yaml, telemetry.yaml, projection.yaml  (populated)
+│   └── rl.yaml, experiments.yaml                          (empty)
 │
 ├── data/
-│   └── processed/
-│       ├── nb01/telemetry_n20_t2000.csv
-│       └── nb02/{trajectory_stats.csv, transition_coords.csv}
+│   ├── raw/nb01–nb05      → .npy arrays per notebook
+│   └── processed/nb01–nb05 → .csv summaries per notebook
 │
+├── outputs/
+│   ├── figures/nb01–nb05  → generated plots
+│   └── reports/nb01–nb04  → PDF writeups
+│
+├── paper/                  → TMLR LaTeX draft + SageMath math appendix
+├── r/                       → Independent R statistics/visualization track
 ├── docs/
-│   ├── obsidian-notes/   → Research notes (Obsidian vault)
-│   ├── lbsm-math/        → Mathematical derivations
-│   └── NotebookAnalysis/ → Notebook analysis PDFs
+│   └── references/         → this directory
 │
-├── pyproject.toml
-├── setup.cfg
-├── requirements.txt
-├── environment.yml
-├── flake.nix             → Nix environment config
-└── Makefile
+├── pyproject.toml, setup.cfg, requirements.txt, environment.yml, flake.nix, Makefile
 ```
 
 ---
 
 ## 🎓 References & Background
 
-### Research Paper (Still in progress)
+### Research Paper (in progress)
 "Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
-- Extensively referenced in docstrings
-- Sections cited: 3.1 (regimes), 3.2 (agent dynamics), 5.1 (PCA), 5.2 (UMAP), 5.4 (metrics)
+- Section outline: `paper/paper-skeleton.md` — maps directly onto the `src/` module structure (§3 simulation, §5 manifold, §6 HMM, §7 drift, §8 RL)
+- Draft LaTeX source: `paper/latex-tmlr/`
+- Math appendix (SageMath): `paper/math-supplementry/`
 
 ### Related Work
 - Hidden Markov Models (HMM) for state inference
 - Manifold learning (dimensionality reduction)
 - Behavior analysis in adaptive systems
 - Drift detection in time series
-
----
-
-##  📋 Ongoing Work
-
-### Code Status
-- ✅ Simulation: Production-ready
-- ✅ Manifold Learning: Production-ready
-- 📋 Testing: Empty test files (needs coverage - pending)
-- 📋 HMM: Interfaces defined, implementation pending
-- 📋 Drift: Interfaces defined, implementation pending
-- 📋 RL: Interfaces defined, implementation pending
-
-### Scalability
-- Current: 20 agents × 2,000 timesteps (manageable)
-- Challenge: N > 100K agents or T > 100K timesteps (memory/compute)
-
-### Analysis Depth
-- Visual manifold quality: ✅ Complete
-- Statistical validation: ⚠️ Limited (needs more rigor - ongoing)
-- Temporal dynamics: 📋 Planned (drift detection)
-- Adaptive learning: 📋 Planned (RL integration)
+- Potential-based reward shaping in RL
 
 ---

@@ -3,12 +3,12 @@
 ## Key Design Patterns
 
 ### 1. Result Container Pattern (Dataclasses)
-The codebase uses frozen dataclasses to encapsulate complex results:
+The codebase uses frozen dataclasses to encapsulate complex results, now spanning every analysis branch:
 
 ```python
 from dataclasses import dataclass
 
-@dataclass(frozen=True)  # Immutable
+@dataclass(frozen=True)
 class PCAResult:
     embedding: np.ndarray
     explained_var: np.ndarray
@@ -17,570 +17,355 @@ class PCAResult:
     pca_model: PCA
     n_components_90: int
 
-@dataclass(frozen=True)
-class UMAPResult:
-    embedding: np.ndarray
-    n_neighbors: int
-    min_dist: float
-    n_components: int
-    reducer: object  # umap.UMAP instance
+@dataclass
+class HMMResult:                # src/hmm/hidden_state_model.py
+    model: object
+    pred_raw: np.ndarray
+    pred_aligned: np.ndarray     # after Hungarian label alignment
+    posteriors_all: np.ndarray
+    mapping: dict                # {learned_label: gt_label}
+    ari: float
+    accuracy: float
+    log_likelihood: float
+    confusion: np.ndarray
+    convergence_ll: list
+    n_iter_actual: int
+
+@dataclass
+class MahalanobisResult:        # src/drift/drift_detection.py
+    scores: np.ndarray
+    flags: np.ndarray
+    threshold: float
 ```
 
-**Rationale**: 
-- Encapsulates related results together
-- Immutable (frozen=True) prevents accidental modification
-- Type-safe: IDE completion and type checking
-- Self-documenting: attributes list all computed values
+**Rationale**:
+- Encapsulates related results together; self-documenting attribute lists
+- `frozen=True` where the result should never mutate after fitting (PCA/UMAP/t-SNE); plain `@dataclass`
+  where a training loop's result legitimately gets appended to over time (HMM/EWMA/KL results are built once
+  and returned, so either works — the codebase isn't fully consistent about `frozen` and that's fine)
 
 ---
 
 ### 2. Factory Function Pattern
-Convenience wrappers for object creation:
+Convenience wrappers for object creation, now extended into RL (`make_env_pool`, `train_agent_pool`):
 
 ```python
-def make_agent(
-    agent_id: Optional[str] = None,
-    initial_state: str = "stable",
-    rng_seed: Optional[int] = None,
-    **kwargs,
-) -> AdaptiveAgent:
-    """Convenience factory wrapping AdaptiveAgent."""
-    return AdaptiveAgent(
-        agent_id=agent_id,
-        initial_state=initial_state,
-        rng_seed=rng_seed,
-        **kwargs,
-    )
-
-def make_agent_pool(
-    n_agents: int,
-    initial_states: Optional[Sequence[str]] = None,
-    base_seed: int = 42,
-) -> List[AdaptiveAgent]:
-    """Create a heterogeneous pool of agents."""
+def make_agent_pool(n_agents, initial_states=None, base_seed=42):
     if initial_states is None:
-        initial_states = list(PROFILE_NAMES)  # Cycle through all regimes
-    
-    agents = []
-    for i in range(n_agents):
-        state = initial_states[i % len(initial_states)]
-        agent = AdaptiveAgent(
-            agent_id=f"agent_{i:04d}",
-            initial_state=state,
-            rng_seed=base_seed + i,
-        )
-        agents.append(agent)
-    return agents
+        initial_states = list(PROFILE_NAMES)
+    return [
+        AdaptiveAgent(agent_id=f"agent_{i:04d}", initial_state=initial_states[i % len(initial_states)], rng_seed=base_seed + i)
+        for i in range(n_agents)
+    ]
+
+def make_env_pool(n_envs, base_seed=42, delta=..., n_steps=...):
+    """src/rl/environment.py — same base_seed+offset idiom, applied to BehavioralEnv."""
+
+def train_agent_pool(envs, config, healthy_envelope, verbose=False):
+    """src/rl/q_learning.py — one QLearningAgent per env, same fan-out shape as make_agent_pool."""
 ```
 
-**Rationale**:
-- Simplifies common creation scenarios
-- Enforces sensible defaults (cycling through regimes)
-- Reproducible: base_seed + offset ensures different but deterministic seeds
+**Rationale**: simplifies common creation scenarios; `base_seed + offset` keeps agents/envs reproducible
+but non-identical. The same shape (`n_x -> List[X]`, deterministic per-item seed) now appears in three
+different modules (`simulation`, `rl.environment`, `rl.q_learning`) — recognize it as one idiom, not three.
 
 ---
 
 ### 3. Validation Pattern
-Explicit validation with informative error messages:
+Explicit validation with informative error messages — unchanged from the original simulation code:
 
 ```python
 @staticmethod
 def _validate_transition_matrix(T: np.ndarray) -> None:
-    """Validate transition matrix properties."""
     k = len(PROFILE_NAMES)
-    
-    # Shape check
     if T.shape != (k, k):
         raise ValueError(f"Transition matrix must be ({k},{k}), got {T.shape}.")
-    
-    # Row-stochasticity check (all rows sum to 1)
     row_sums = T.sum(axis=1)
     if not np.allclose(row_sums, 1.0, atol=1e-6):
-        raise ValueError(
-            f"All rows must sum to 1. Got row sums: {row_sums}."
-        )
-    
-    # Non-negativity check
+        raise ValueError(f"All rows must sum to 1. Got row sums: {row_sums}.")
     if (T < 0).any():
         raise ValueError("Transition probabilities must be non-negative.")
 ```
 
-**Rationale**:
-- Fails fast with clear error messages
-- Prevents silent data corruption
-- Helps with debugging
-
 ---
 
 ### 4. AR-1 Temporal Correlation Pattern
-Implementing realistic time-series autocorrelation:
-
 ```python
-def sample(
-    self,
-    n: int = 1,
-    rng: np.random.Generator | None = None,
-    prev: np.ndarray | None = None,
-) -> np.ndarray:
-    """Draw samples with AR-1 correlation."""
-    
-    # Initialize RNG if not provided
+def sample(self, n=1, rng=None, prev=None) -> np.ndarray:
     if rng is None:
         rng = np.random.default_rng()
-
-    # Generate Gaussian noise
-    noise = rng.normal(loc=0.0, scale=1.0, size=(n, N_FEATURES))
+    noise = rng.normal(0.0, 1.0, size=(n, N_FEATURES))
     samples = np.empty((n, N_FEATURES))
-
-    # AR-1 process: x_t = ρ·x_{t-1} + √(1-ρ²)·noise
     x_prev = prev if prev is not None else self.means.copy()
-    
     for t in range(n):
         x_t = self.autocorr * x_prev + np.sqrt(1.0 - self.autocorr**2) * (self.means + self.stds * noise[t])
         samples[t] = x_t
         x_prev = x_t
-
     return samples
 ```
-
-**Rationale**:
-- AR-1 model: x_t = ρ·x_{t-1} + (1-ρ)·mean + noise
-- ρ ≈ 0.3: temporal smoothing (realistic behavioral persistence)
-- Normalization by √(1-ρ²) maintains variance stationarity
+ρ ≈ 0.3; normalization by √(1-ρ²) keeps variance stationary.
 
 ---
 
 ### 5. Hidden State Management Pattern
-Encapsulating state transitions:
-
 ```python
 def _transition(self) -> None:
-    """Sample next hidden state from Markov chain."""
-    # Get transition probabilities from current state row
     probs = self._T[self._state_idx]
-    
-    # Sample next state
-    self._state_idx = int(
-        self._rng.choice(len(PROFILE_NAMES), p=probs)
-    )
+    self._state_idx = int(self._rng.choice(len(PROFILE_NAMES), p=probs))
 
-def step(self, timestep: int) -> Dict:
-    """One timestep: emit → record → transition."""
-    
-    # 1. Emit telemetry under current state
+def step(self, timestep: int) -> dict:
     telemetry_vec = self._emit()
-    
-    # 2. Build record with metadata
-    record: Dict = {
-        "agent_id": self.agent_id,
-        "timestep": timestep,
-        "hidden_state": self.current_state,  # Ground truth (hidden to analysis)
-    }
-    for feat, val in zip(TELEMETRY_FEATURES, telemetry_vec):
-        record[feat] = float(val)
-    
+    record = {"agent_id": self.agent_id, "timestep": timestep, "hidden_state": self.current_state}
+    record.update(zip(TELEMETRY_FEATURES, telemetry_vec.astype(float)))
     self._history.append(record)
-    
-    # 3. Stochastic transition (for *next* step)
     self._transition()
-    
     return record
 ```
-
-**Rationale**:
-- Separation of concerns: emission vs. transition
-- Hidden state remains opaque to external code (accessed via `current_state` property)
-- History tracks both hidden states (for validation) and features (for analysis)
 
 ---
 
 ### 6. Index Mapping Pattern
-Bidirectional mapping between states and indices:
+```python
+_STATE_INDEX = {name: i for i, name in enumerate(PROFILE_NAMES)}
+_INDEX_STATE = {i: name for i, name in enumerate(PROFILE_NAMES)}
+```
+This same bidirectional-mapping idea reappears in `src/rl/environment.py` as `obs_to_grid()` /
+`grid_to_coords()` — a discrete `(latency_bin, entropy_bin)` grid position ↔ flat state index, used by
+`BehavioralEnv` exactly the way `_STATE_INDEX` is used by `AdaptiveAgent`.
+
+---
+
+### 7. Hungarian-Alignment Pattern (new — `src/hmm`)
+Unsupervised clustering/HMM state labels are arbitrary permutations of the true regime indices; before
+computing accuracy you must find the best label permutation:
 
 ```python
-# Map regime name → integer index
-_STATE_INDEX: Dict[str, int] = {name: i for i, name in enumerate(PROFILE_NAMES)}
-# Map integer index → regime name
-_INDEX_STATE: Dict[int, str] = {i: name for i, name in enumerate(PROFILE_NAMES)}
+from scipy.optimize import linear_sum_assignment
 
-@property
-def current_state(self) -> str:
-    """Current hidden behavioral regime name."""
-    return _INDEX_STATE[self._state_idx]
-
-# Usage in Markov chain
-probs = self._T[_STATE_INDEX[from_state], _STATE_INDEX[to_state]]
+def align_labels(pred, y_gt, n_states):
+    confusion = np.zeros((n_states, n_states))
+    for p, g in zip(pred, y_gt):
+        confusion[p, g] += 1
+    row_ind, col_ind = linear_sum_assignment(-confusion)   # maximize overlap
+    mapping = dict(zip(row_ind, col_ind))
+    return np.array([mapping[p] for p in pred]), mapping
 ```
+Used by `HMMResult.mapping` / `pred_aligned` (`hidden_state_model.fit_hmm`) and again independently per-agent
+in `latent_state_metrics.per_agent_metrics` — every agent's HMM decode can settle on a *different* label
+permutation, so alignment has to happen per-agent, not once globally.
 
-**Rationale**:
-- Numerical indices for efficient matrix operations
-- String names for human readability
-- Bidirectional mapping ensures consistency
+---
+
+### 8. Sweep-Function Pattern (new — pervasive across hmm/drift/manifold/rl)
+The dominant "model selection" idiom in this codebase is a function that loops over a hyperparameter grid
+and returns a scored `DataFrame`, rather than an optimizer object:
+
+```python
+def model_selection_sweep(X_concat, lengths, n_comp_grid, ...):
+    """src/hmm/sequence_inference.py — BIC/AIC per candidate n_components."""
+
+def alpha_sweep(X, y_gt, alpha_grid):
+    """src/drift/ewma.py — AUC per candidate smoothing factor."""
+
+def window_size_sweep(X, y_gt, mu_ref, var_ref, window_grid):
+    """src/drift/kl_divergence.py — AUC per candidate window size."""
+
+def threshold_sweep(scores, y_gt, n_pts):
+    """src/drift/drift_detection.py — precision/recall/F1/FPR per threshold."""
+
+def hyperparameter_sweep(X, labels, n_neighbors_grid, min_dist_grid, ...):
+    """src/manifold/umap_projection.py — silhouette per (n_neighbors, min_dist)."""
+```
+If you're adding a new hyperparameter search anywhere in this codebase, match this shape: take a grid
+(or several), return a tidy DataFrame with one row per configuration and the relevant score column(s) —
+don't introduce a different sweep abstraction.
+
+---
+
+### 9. Potential-Based Reward Shaping (new — `src/rl/reward_dynamics.py`)
+```python
+class ManifoldPotential:
+    """Φ(x) = -||(x - μ_healthy) / σ_healthy||_2"""
+    def potential(self, telemetry_vec): ...
+    def shaping_bonus(self, prev_telemetry, next_telemetry, gamma):
+        return gamma * self.potential(next_telemetry) - self.potential(prev_telemetry)
+```
+Standard Ng-Harada-Russell shaping: adding `F(s,a,s') = γΦ(s') − Φ(s)` to the reward doesn't change the
+optimal policy, but densifies the reward signal toward the healthy-regime manifold centroid computed by
+`drift.fit_healthy_envelope`. This is the concrete link between the RL branch and the drift-detection branch.
+
+### 10. Reward Curriculum Pattern (new — `src/rl/reward_dynamics.py`)
+```python
+@dataclass
+class RewardCurriculum:
+    r_unstable_start: float
+    r_unstable_final: float
+    n_warmup_episodes: int
+    def unstable_penalty(self, episode):
+        frac = min(episode / self.n_warmup_episodes, 1.0)
+        return self.r_unstable_start + frac * (self.r_unstable_final - self.r_unstable_start)
+```
+Linearly ramps the "unstable regime" penalty over training instead of fixing it, so early ε-greedy
+exploration into `unstable` isn't punished as harshly as it would be once the policy has matured.
+
+### 11. Count-Based Curiosity Bonus (new — `src/rl/exploration.py`)
+```python
+class CuriosityBonus:
+    """β / sqrt(N(s,a) + 1), β decayed geometrically each episode."""
+    def bonus(self, state, action): ...
+    def update(self, state, action): ...   # increments N(s,a)
+```
+Standard count-based exploration bonus (MBIE-EB style), decoupled from the ε-greedy schedule
+(`EpsilonSchedule`) — the two exploration mechanisms are composed, not merged into one class.
 
 ---
 
 ## Statistical Concepts
 
 ### 1. Manifold Hypothesis
-**Core Claim**: High-dimensional telemetry (6D) lies on a low-dimensional manifold (≤3D)
+High-dimensional telemetry (6D) lies on a low-dimensional manifold (≤3D). PCA: PC1 explains ~60% of
+variance; 2–3 PCs sufficient for 90% variance. UMAP preserves local topology better than PCA; t-SNE is
+fit on a stratified subsample for stability/speed (`fit_tsne(..., stratified=True)`).
 
-**Evidence**:
-- PCA: PC1 explains ~60% of variance (healthy/unstable axis)
-- PC2, PC3 capture intra-healthy separation
-- Total of 2-3 PCs sufficient for 90% variance
+### 2–6. Cluster/embedding quality metrics
+Silhouette [−1,1]↑, Davies-Bouldin [0,∞)↓, Calinski-Harabasz [0,∞)↑, Trustworthiness [0,1]↑, Continuity
+[0,1]↑ — formulas and interpretation unchanged from the original manifold-only version of this doc; see
+`src/manifold/manifold_metrics.py` / `src/evaluation/manifold_quality.py` for the implementations.
 
-**Manifold Learning Methods**:
-- **PCA**: Linear projection (baseline)
-- **UMAP**: Local topology preservation (primary)
-  - Preserves neighborhood structure better than PCA
-  - Reveals true manifold curvature
-  - Hyperparameters: n_neighbors (30), min_dist (0.1)
-- **t-SNE**: Global structure (alternative)
-  - Good for visualization but less stable for analysis
+### 7. Regime Connectivity (LBSM-specific, `src/manifold/umap_projection.py`)
+Fraction of k-NN edges in the embedding that cross a regime boundary — high → regimes blend smoothly, low →
+sharp boundaries.
 
----
-
-### 2. Silhouette Coefficient
-Cluster separation metric in embedding space:
-
+### 8. HMM Model Selection: BIC / AIC (new — `src/hmm/sequence_inference.py`)
 ```
-silhouette(i) = (b(i) - a(i)) / max(a(i), b(i))
-
-where:
-  a(i) = average distance to points in same cluster
-  b(i) = minimum average distance to other clusters
+BIC = -2·log L + k·log(N)        AIC = -2·log L + 2k
 ```
+where `k` is the number of free parameters (grows with `n_components`) and `N` the number of observations.
+`model_selection_sweep()` fits a Gaussian HMM at each candidate `n_components` and reports both — used to
+justify choosing 4 hidden states rather than assuming it.
 
-**Range**: [−1, 1]
-- +1: perfect clustering
-- 0: random/overlapping
-- −1: inverted/wrong cluster assignment
-
-**Interpretation for LBSM**:
-- High silhouette → regimes form distinct clusters in embedding
-- Validates manifold structure captures behavioral separation
-
----
-
-### 3. Davies-Bouldin Index
-Average similarity between each cluster and its most similar neighbor:
-
+### 9. Spectral Gap (new — `src/hmm/transition_analysis.py`)
 ```
-DB = (1/k) Σ max_{j≠i} (σ_i + σ_j) / d_{ij}
-
-where:
-  k = number of clusters
-  σ_i = avg distance within cluster i
-  d_ij = distance between cluster centroids
+spectral_gap(T) = 1 - |λ_2|
 ```
+where λ_2 is the second-largest eigenvalue magnitude of the transition matrix. Larger gap → faster mixing /
+shorter memory of past states; used to compare the learned vs. ground-truth transition matrices' dynamics,
+not just their entries.
 
-**Interpretation**:
-- Lower is better (well-separated, compact clusters)
-- 0 = perfect; high = overlapping/loose clusters
-
----
-
-### 4. Calinski-Harabasz Score
-Ratio of between-cluster to within-cluster variance:
-
+### 10. Mahalanobis Distance / Healthy Envelope (new — `src/drift/drift_detection.py`)
 ```
-CH = (Tr(S_B) / (k-1)) / (Tr(S_W) / (N-k))
-
-where:
-  S_B = between-cluster scatter
-  S_W = within-cluster scatter
+d_M(x) = sqrt( (x - μ)ᵀ Σ⁻¹ (x - μ) )
 ```
+fit only on `healthy_regimes` observations (e.g. `stable`). This is also exactly what
+`BehaviorProfile.mahalanobis()` and `rl.reward_dynamics.ManifoldPotential` use — one distance concept
+reused across simulation validation, drift detection, and RL reward shaping.
 
-**Interpretation**:
-- Higher is better (tight, well-separated clusters)
-- Dimensionless ratio; scale-invariant
-
----
-
-### 5. Trustworthiness
-Measures neighborhood preservation from high-D to low-D:
-
+### 11. EWMA Residual Scoring (new — `src/drift/ewma.py`)
 ```
-T = 1 - (2 / (N·k·(2m - 3k - 1))) Σ_i Σ_u∈U(i) r(i, u)
+S_t = α·x_t + (1-α)·S_{t-1}          score_t = |x_t - S_t|
 ```
+Adaptive threshold computed after a `warmup` period (so the filter has stabilized before flagging begins).
 
-**Meaning**:
-- For each point in embedding, check if k-NN match high-D k-NN
-- High T → local structure well-preserved
-- Used to validate embedding quality
-
----
-
-### 6. Continuity
-Inverse of trustworthiness (embedding to high-D):
-
+### 12. Gaussian KL Divergence Drift (new — `src/drift/kl_divergence.py`)
+For diagonal-covariance Gaussians (per-feature independent):
 ```
-Validates that no "tears" introduced in embedding
+KL(p‖q) = Σ_i [ log(σ_qi/σ_pi) + (σ_pi² + (μ_pi-μ_qi)²)/(2σ_qi²) - 1/2 ]
 ```
+computed between each sliding window's empirical distribution and a fixed healthy `fit_reference()`
+distribution — `window_size` trades detection latency against noise.
 
----
-
-### 7. Regime Connectivity
-Custom metric (LBSM-specific):
-
-```
-Measures fraction of k-NN edges crossing regime boundaries
-
-High connectivity → regimes blend smoothly in manifold
-Low connectivity → sharp boundaries between regimes
-```
-
-**Formula**:
-```python
-def regime_connectivity(embedding, labels, k=10):
-    """Fraction of k-NN cross-regime edges."""
-    n_cross = 0
-    n_total = 0
-    
-    for i in range(len(labels)):
-        # Find k nearest neighbors
-        distances = np.linalg.norm(embedding - embedding[i], axis=1)
-        knn_indices = np.argsort(distances)[1:k+1]  # Skip self
-        
-        # Count cross-regime edges
-        for j in knn_indices:
-            n_total += 1
-            if labels[i] != labels[j]:
-                n_cross += 1
-    
-    return n_cross / n_total
-```
+### 13. Detection Latency & Shift Magnitude (new — `src/drift/regime_shift_analysis.py`)
+Detectors are evaluated by how many timesteps after a `ground_truth_changepoints()` event they first flag
+(`detection_latency`), not just by pointwise precision/recall — a detector that's accurate but slow is a
+different failure mode than one that's fast but noisy, and this codebase measures both.
 
 ---
 
 ## Data Flow in Key Functions
 
-### AdaptiveAgent.step() Flow
+### AdaptiveAgent.step() Flow — unchanged, see previous versions of this doc / `src/simulation/agent.py`.
 
+### fit_hmm() Flow (new)
 ```
-BEFORE step(t):
-  - _state_idx: current hidden state index
-  - _prev_telemetry: last emission (for AR-1)
+INPUT: X_concat (all agents stacked), lengths (per-agent sequence lengths), y_gt (for scoring only)
 
-STEP 1: Emit telemetry
-  ├─ Get current profile from _state_idx
-  ├─ Sample from profile.sample() with AR-1 correlation
-  ├─ Use _prev_telemetry as AR-1 seed
-  └─ Update _prev_telemetry for next step
+STEP 1: hmmlearn.GaussianHMM(n_components, covariance_type).fit(X_concat, lengths)  — Baum-Welch/EM
+STEP 2: model.predict(X_concat, lengths)  — Viterbi decode -> pred_raw
+STEP 3: Hungarian-align pred_raw to y_gt (per confusion matrix) -> pred_aligned, mapping
+STEP 4: score: ARI(pred_raw, y_gt) [permutation-invariant], accuracy(pred_aligned, y_gt), confusion matrix
+STEP 5: posteriors_all = model.predict_proba(X_concat, lengths)  — for posterior_entropy() downstream
 
-STEP 2: Build and store record
-  ├─ Create dict with agent_id, timestep, hidden_state (ground truth!)
-  ├─ Add features (latency, entropy, reward, memory_usage, error_rate, action_freq)
-  ├─ Append to _history
-  └─ Return record
-
-STEP 3: Transition (for next step)
-  ├─ Get transition probabilities from row _state_idx
-  ├─ Sample next _state_idx from multinomial
-  └─ (Hidden states updated but not visible in record)
-
-AFTER step(t):
-  - _state_idx: updated for next step
-  - _history: extended with new record
-  - _prev_telemetry: ready for next emission
+OUTPUT: HMMResult
 ```
 
-### fit_umap() Flow
-
+### QLearningAgent.train() Flow (new)
 ```
-INPUT: X (N×6 feature matrix, z-scored)
+INPUT: BehavioralEnv, QLearningConfig, HealthyEnvelope (for reward shaping / Mahalanobis tracking)
 
-STEP 1: Fit UMAP
-  ├─ Create UMAP(n_neighbors=30, min_dist=0.1, ...)
-  ├─ fit_transform(X) → embedding (N×2 or N×3)
-  └─ Store fitted reducer for future transform()
+PER EPISODE:
+  1. env.reset() -> obs
+  2. PER STEP: ε-greedy _select_action(obs) using EpsilonSchedule (+ optional CuriosityBonus)
+     -> env.step(action) -> StepResult(obs', reward, done, info)
+     -> reward may be shaped: RewardCurriculum.compute_reward() + ManifoldPotential.shaping_bonus()
+     -> tabular Q-update: Q[s,a] += alpha * (r + gamma * max_a' Q[s',a'] - Q[s,a])
+  3. Track EpisodeStats: total_reward, regime_fractions (dwell time per regime this episode),
+     mean_mah_score (via _mahalanobis_from_envelope against HealthyEnvelope), epsilon, n_steps
+  4. EpsilonSchedule.step() -> decay epsilon for next episode
 
-STEP 2: Extract hyperparameters
-  └─ Store n_neighbors, min_dist in result
-
-OUTPUT: UMAPResult with embedding + metadata
-
-POST-FIT ANALYSIS:
-  ├─ regime_connectivity(embedding, labels) → Boundary porosity
-  ├─ silhouette_score(embedding, labels) → Cluster separation
-  └─ regime_centroids_umap(embedding, labels) → Cluster positions
+OUTPUT: training_dataframe() (tidy per-episode log) feeding reward_tracking.py and adaptation_dynamics.py
 ```
 
-### embedding_scorecard() Flow
-
-```
-INPUT: X_high (N×6), X_embedded (N×2), labels (N,), method_name
-
-STEP 1: Cluster quality (in embedding space)
-  ├─ silhouette_score(X_embedded, labels) → [-1, 1]
-  ├─ davies_bouldin_score(X_embedded, labels) → [0, ∞)
-  └─ calinski_harabasz_score(X_embedded, labels) → [0, ∞)
-
-STEP 2: Topology preservation
-  ├─ Sub-sample to 3000 points (speedup)
-  ├─ trustworthiness(X_high[:3k], X_embedded[:3k]) → [0, 1]
-  └─ continuity(X_high[:3k], X_embedded[:3k]) → [0, 1]
-
-STEP 3: Build scorecard
-  └─ Return dict {
-        "method": "PCA" / "UMAP" / ...,
-        "silhouette": float,
-        "davies_bouldin": float,
-        "calinski_harabasz": float,
-        "trustworthiness": float,
-        "continuity": float,
-      }
-
-COMPARE EMBEDDINGS:
-  └─ compare_embeddings([scorecard1, scorecard2]) → pd.DataFrame
-```
+### embedding_scorecard() Flow — unchanged, see `src/manifold/manifold_metrics.py`.
 
 ---
 
 ## Key Constants & Enumerations
 
-### Hidden States (PROFILE_NAMES)
-```python
-PROFILE_NAMES = ("stable", "exploratory", "adaptive", "unstable")
-```
+### Hidden States / Telemetry Features / Default Transition Matrix
+Unchanged — see `src/simulation/behavior_profiles.py` (`PROFILE_NAMES`, `TELEMETRY_FEATURES`) and
+`src/simulation/agent.py` (`DEFAULT_TRANSITION_MATRIX`).
 
-### Telemetry Features (TELEMETRY_FEATURES)
+### RL Grid Constants (new — `src/rl/environment.py`, re-exported via `src/rl/__init__.py`)
 ```python
-TELEMETRY_FEATURES = (
-    "latency",        # ms   — response / action latency
-    "entropy",        # bits — policy / action-distribution entropy
-    "reward",         # a.u. — instantaneous reward signal
-    "memory_usage",   # MB   — working-set memory footprint
-    "error_rate",     # [0,1]— proportion of erroneous actions
-    "action_freq",    # Hz   — actions per second
-)
+N_STATES, N_ACTIONS, N_GRID_LATENCY, N_GRID_ENTROPY
+ACTION_PUSH_STABLE, ACTION_PUSH_EXPLORATORY, ACTION_DO_NOTHING
+DELTA_BASE, N_STEPS_PER_EPISODE
 ```
-
-### Default Transition Matrix (4×4)
-```python
-DEFAULT_TRANSITION_MATRIX = np.array(
-    #  stable  explor  adapt   unstab
-    [[ 0.75,   0.15,   0.05,   0.05 ],   # from stable
-     [ 0.05,   0.55,   0.30,   0.10 ],   # from exploratory
-     [ 0.30,   0.10,   0.50,   0.10 ],   # from adaptive
-     [ 0.10,   0.10,   0.10,   0.70 ]],  # from unstable
-    dtype=np.float64,
-)
-```
-
-**Interpretation**:
-- Stable agents mostly stay stable (0.75) but explore (0.15)
-- Exploratory agents learn and adapt (0.30)
-- Adaptive agents maintain strategy (0.50) or stabilize (0.30)
-- Unstable agents persist (0.70) or recover randomly
+`N_STATES = N_GRID_LATENCY * N_GRID_ENTROPY` — the same "index ↔ 2-tuple" mapping idea as `_STATE_INDEX`,
+just over a 2-D discretization grid instead of the 4 named regimes.
 
 ---
 
 ## Error Handling & Validation
-
-### State Validation
-```python
-if initial_state not in _STATE_INDEX:
-    raise ValueError(
-        f"Unknown initial_state {initial_state!r}. "
-        f"Valid: {list(_STATE_INDEX.keys())}"
-    )
-```
-
-### Matrix Validation
-```python
-# Check shape
-if T.shape != (4, 4):
-    raise ValueError(f"Expected (4,4), got {T.shape}")
-
-# Check row-stochasticity
-if not np.allclose(T.sum(axis=1), 1.0, atol=1e-6):
-    raise ValueError("Rows must sum to 1")
-
-# Check non-negativity
-if (T < 0).any():
-    raise ValueError("Probabilities must be non-negative")
-```
+Unchanged from the original doc — `_validate_transition_matrix`, unknown-state checks. No new validation
+idioms were introduced in `hmm`/`drift`/`rl`; they mostly trust well-formed inputs (arrays of the expected
+shape from upstream `manifold`/`telemetry` calls) rather than re-validating.
 
 ---
 
 ## Reproducibility Practices
-
-### Random Seed Usage
-```python
-# Simulation
-agent = AdaptiveAgent(rng_seed=42)
-agents = make_agent_pool(base_seed=42)  # agent_i gets seed 42+i
-
-# Manifold learning
-pca = PCA(random_state=42)
-umap = UMAP(random_state=42)
-
-# Metrics
-silhouette_score(..., random_state=42)
-```
-
-### Deterministic Ordering
-```python
-# Consistent feature ordering
-TELEMETRY_FEATURES = ("latency", "entropy", "reward", ...)
-
-# Consistent regime ordering
-PROFILE_NAMES = ("stable", "exploratory", "adaptive", "unstable")
-
-# Consistent agent IDs
-f"agent_{i:04d}"  # Ensures lexicographic sorting: agent_0000, agent_0001, ...
-```
+Unchanged: `rng_seed` / `base_seed` threaded through every factory (`make_agent_pool`, `make_env_pool`,
+`train_agent_pool`), `random_state=42` for sklearn/UMAP, deterministic `PROFILE_NAMES` /
+`TELEMETRY_FEATURES` ordering, `agent_{i:04d}` IDs for lexicographic sort stability.
 
 ---
 
 ## Type Hints & Documentation
-
-### Example Function Signature
-```python
-def fit_pca(
-    X: np.ndarray,                           # Input array with type hint
-    feature_names: Tuple[str, ...],          # Tuple of strings
-    n_components: Optional[int] = None,      # Optional with default
-    random_state: int = 42,                  # Keyword with default
-) -> PCAResult:                               # Return type hint
-    """Fit PCA on a z-scored feature matrix.
-    
-    Parameters
-    ----------
-    X : np.ndarray  shape (N, d)
-        Input feature matrix (should be z-scored).
-    feature_names : tuple of str
-        Column names (length d).
-    n_components : int | None
-        Number of components to retain. If None, keeps min(N, d).
-    random_state : int
-        Reproducibility seed for sklearn PCA.
-    
-    Returns
-    -------
-    result : PCAResult
-        Object containing embedding, loadings, explained variance, etc.
-        
-    Reference
-    ---------
-    "Latent Behavioral State Machines: ..."
-    Section 5.1 — Linear Baseline: Principal Component Analysis
-    """
-```
-
-**Style**:
-- NumPy docstring format
-- Type hints on all parameters
-- Clear shape annotations (e.g., "shape (N, d)")
-- References to paper sections
+NumPy-style docstrings, type hints on parameters, shape annotations. This style is consistent across the
+newer `hmm`/`drift`/`rl` modules too — the extraction script in `CODEBASE_UNDERSTANDING.md`'s verification
+note pulls the first docstring line for every function if you want to spot-check style compliance.
 
 ---
 
-## Testing Patterns (Planned)
+## Testing Patterns
+
+**Only 2 of 6 test files have real assertions** — `tests/test_simulation.py` and `tests/test_manifold.py`.
+The other four (`test_drift.py`, `test_hmm.py`, `test_metrics.py`, `test_projection.py`, `test_rl.py`) are
+empty despite `hmm`, `drift`, `rl`, and `evaluation` all being fully implemented — this is the single
+biggest coverage gap in the repo.
 
 ```python
-# tests/test_simulation.py
+# tests/test_simulation.py (real)
 def test_agent_initialization():
     agent = AdaptiveAgent(agent_id="test_agent", initial_state="stable")
     assert agent.current_state == "stable"
@@ -589,42 +374,41 @@ def test_agent_initialization():
 def test_agent_step():
     agent = AdaptiveAgent(rng_seed=42)
     record = agent.step(timestep=0)
-    
     assert record["timestep"] == 0
     assert record["hidden_state"] in PROFILE_NAMES
     assert all(feat in record for feat in TELEMETRY_FEATURES)
-    assert len(agent.history) == 1
 
 def test_transition_matrix_validation():
-    invalid_T = np.array([[0.5, 0.5], [0.5, 0.5]])  # Wrong shape
+    invalid_T = np.array([[0.5, 0.5], [0.5, 0.5]])  # wrong shape
     with pytest.raises(ValueError):
         AdaptiveAgent._validate_transition_matrix(invalid_T)
 
 def test_stationary_distribution():
-    agent = AdaptiveAgent()
-    pi = agent.stationary_distribution()
-    assert np.allclose(pi.sum(), 1.0)  # Probability distribution
-    assert (pi >= 0).all()  # Non-negative
+    pi = AdaptiveAgent().stationary_distribution()
+    assert np.allclose(pi.sum(), 1.0)
+    assert (pi >= 0).all()
 
-# tests/test_manifold.py
+# tests/test_manifold.py (real)
 def test_pca_explained_variance():
     result = fit_pca(X_synthetic, feature_names)
-    assert result.explained_var.sum() <= 1.0001  # Allow floating-point error
-    assert result.cumulative_var[-1] <= 1.0001
+    assert result.explained_var.sum() <= 1.0001
 
 def test_umap_hyperparameter_sweep():
     sweep_result = hyperparameter_sweep(X_synthetic, labels, ...)
-    assert "n_neighbors" in sweep_result.columns
-    assert "min_dist" in sweep_result.columns
-    assert "silhouette" in sweep_result.columns
+    assert {"n_neighbors", "min_dist", "silhouette"} <= set(sweep_result.columns)
 
 def test_embedding_scorecard_keys():
     scorecard = embedding_scorecard(X_high, X_embedded, labels)
-    required_keys = ["method", "silhouette", "davies_bouldin", 
-                     "calinski_harabasz", "trustworthiness", "continuity"]
-    assert all(k in scorecard for k in required_keys)
+    required = {"method", "silhouette", "davies_bouldin", "calinski_harabasz", "trustworthiness", "continuity"}
+    assert required <= set(scorecard)
 ```
+
+If you're picking up coverage work, `test_hmm.py`/`test_drift.py`/`test_rl.py` are the highest-value gaps —
+each covers a fully-implemented module with real scientific claims (ARI/accuracy, detection latency, reward
+convergence) that currently have zero automated verification.
 
 ---
 
-This document captures the key design decisions, statistical foundations, and implementation patterns throughout the LBSM codebase.
+This document captures the key design decisions, statistical foundations, and implementation patterns
+throughout the LBSM codebase — including the hmm/drift/rl branches added since the previous version of this
+doc, which described them as "planned."

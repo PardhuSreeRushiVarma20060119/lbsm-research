@@ -54,7 +54,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from ..simulation.agent import AdaptiveAgent, DEFAULT_TRANSITION_MATRIX
-from ..simulation.behavior_profiles import PROFILE_NAMES, BEHAVIOR_PROFILES
+from ..simulation.behavior_profiles import PROFILE_NAMES, BEHAVIOR_PROFILES, TELEMETRY_FEATURES
 
 
 # ---------------------------------------------------------------------------
@@ -90,9 +90,10 @@ R_UNSTABLE = -2.0
 R_EXIT     =  3.0   # one-time bonus for leaving unstable
 
 # Nudge strength (base value; may be annealed externally)
-# The nudge is non-cumulative: always applied relative to DEFAULT_TRANSITION_MATRIX,
-# not the accumulated T_current. This bounds the per-step effect regardless of how
-# many times the action is taken, preventing unstable entry paths from being zeroed.
+# The nudge is cumulative: each push action is applied relative to the *current*
+# T_current row, so repeated same-direction actions compound. Validity (no negative
+# or >1 probabilities) is guaranteed by the floor-and-renormalise step in
+# _nudge_transition, not by resetting to the default matrix every call.
 DELTA_BASE = 0.02
 
 # Episode length
@@ -199,6 +200,30 @@ class BehavioralEnv:
         self._trajectory  : List[Dict] = []
 
     # ------------------------------------------------------------------ #
+    # Internal helpers
+    # ------------------------------------------------------------------ #
+
+    def _emit_record(self, timestep: int) -> Dict:
+        """Emit telemetry for the agent's *current* hidden state, with no transition.
+
+        Mirrors the emission half of :meth:`AdaptiveAgent.step`, but deliberately
+        does not call ``_transition()`` — that happens separately in :meth:`step`,
+        *before* this is called, so that the nudge applied for a given action and
+        the state whose telemetry ends up in the returned observation/reward are
+        the same state the action was chosen in reaction to.
+        """
+        telemetry_vec = self._agent._emit()
+        record: Dict = {
+            "agent_id": self._agent.agent_id,
+            "timestep": timestep,
+            "hidden_state": self._agent.current_state,
+        }
+        for feat, val in zip(TELEMETRY_FEATURES, telemetry_vec):
+            record[feat] = float(val)
+        self._agent._history.append(record)
+        return record
+
+    # ------------------------------------------------------------------ #
     # Gym-style API
     # ------------------------------------------------------------------ #
 
@@ -222,8 +247,9 @@ class BehavioralEnv:
         if self.record_traj:
             self._trajectory = []
 
-        # Emit first observation
-        rec = self._agent.step(0)
+        # Emit first observation WITHOUT transitioning yet — this is the state
+        # the first call to step() will nudge (see _emit_record docstring).
+        rec = self._emit_record(timestep=0)
         obs = obs_to_grid(rec["latency"], rec["entropy"])
         if self.record_traj:
             self._trajectory.append({**rec, "action": -1, "reward": 0.0,
@@ -242,20 +268,25 @@ class BehavioralEnv:
         -------
         StepResult
         """
-        # 1. Modulate transition matrix according to action.
-        # Non-cumulative: nudge is always relative to DEFAULT_TRANSITION_MATRIX
-        # so repeated actions don't compound across steps within an episode.
+        # 1. Modulate transition matrix for the state we are CURRENTLY in — i.e.
+        # the same state that was just reported as `obs` and that this action was
+        # chosen in reaction to. Cumulative: nudges self._T_current (not the
+        # pristine default), so repeated same-direction actions compound.
         if action != ACTION_DO_NOTHING:
             self._T_current = _nudge_transition(
-                DEFAULT_TRANSITION_MATRIX,
+                self._T_current,
                 from_state = self._agent._state_idx,
                 action     = action,
                 delta      = self.delta,
             )
             self._agent._T = self._T_current
 
-        # 2. Step the agent
-        rec = self._agent.step(self._t)
+        # 2. Transition using the (possibly just-nudged) row, THEN emit telemetry
+        # for the resulting state. This ordering — transition before emit — is
+        # what makes this call's reward/obs reflect the state the action caused,
+        # instead of the state the agent was already in before the action ran.
+        self._agent._transition()
+        rec = self._emit_record(self._t)
         hidden = rec["hidden_state"]
 
         # 3. Compute reward
@@ -320,18 +351,20 @@ class BehavioralEnv:
 # ---------------------------------------------------------------------------
 
 def _nudge_transition(
-    T_default  : np.ndarray,
+    T_base     : np.ndarray,
     from_state : int,
     action     : int,
     delta      : float,
 ) -> np.ndarray:
     """Return a new row-stochastic matrix with the *from_state* row nudged.
 
-    **Non-cumulative design**: the nudge is always computed relative to
-    ``T_default`` (i.e. ``DEFAULT_TRANSITION_MATRIX``), not the previously
-    accumulated matrix.  This bounds the per-step effect to a fixed offset
-    regardless of how many consecutive nudge actions are taken, preventing
-    unstable entry probabilities from being driven to zero over an episode.
+    **Cumulative design**: the nudge is computed relative to ``T_base``, which
+    the caller passes as the *current* (possibly already-nudged) transition
+    matrix — so repeated same-direction actions on the same state compound
+    instead of each being discarded back to the pristine default. Validity is
+    guaranteed by the floor-and-renormalise step below, not by resetting to a
+    fixed base every call: a row can drift arbitrarily far from its default
+    under sustained pushes, but can never leave [0.01, 1] or fail to sum to 1.
 
     Push-stable (action=0):
         Increase P(→ stable) by delta, decrease P(→ unstable) by delta.
@@ -342,13 +375,14 @@ def _nudge_transition(
 
     Parameters
     ----------
-    T_default  : DEFAULT_TRANSITION_MATRIX — the base row is always taken from here
+    T_base     : the transition matrix to nudge from — pass the environment's
+                 live ``self._T_current`` for cumulative behaviour
     from_state : current state index (0=stable,1=exploratory,2=adaptive,3=unstable)
     action     : ACTION_PUSH_STABLE or ACTION_PUSH_EXPLORATORY
     delta      : nudge magnitude
     """
-    T_new = T_default.copy()
-    row   = T_new[from_state].copy()   # always start from the default row
+    T_new = T_base.copy()
+    row   = T_new[from_state].copy()   # start from the current (live) row
 
     STABLE_IDX      = _REGIME_IDX["stable"]
     EXPLOR_IDX      = _REGIME_IDX["exploratory"]

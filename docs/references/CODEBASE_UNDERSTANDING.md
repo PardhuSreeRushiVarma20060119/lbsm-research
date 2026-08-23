@@ -8,263 +8,149 @@
 
 **Core Hypothesis**: Adaptive behavioral systems generate observable telemetry that occupies structured low-dimensional statistical manifolds rather than arbitrary high-dimensional space.
 
-**Repository Size**: ~36 MB (includes Jupyter notebooks with generated plots)  
-**Code Size**: ~2,191 lines of Python across 51 modules  
-**Functions**: ~58 function definitions
+**Code size** (`src/`): ~7,500 lines of Python across 55 files (34 non-empty, 21 empty stubs), ~209 top-level functions, ~24 classes/dataclasses.
+
+> Counts verified by walking `src/` with Python's `ast` module and `wc -l` — see the bottom of this file for what "verified" means and how to re-check it yourself.
 
 ---
 
 ## Architecture Overview
 
-### 1. **Simulation Module** (`src/simulation/`)
-Core agent-based simulation for generating behavioral telemetry.
+### 1. **Simulation Module** (`src/simulation/`) — implemented
 
-- **`agent.py`** (343 lines)
+- **`agent.py`**
   - `AdaptiveAgent`: Main agent class with hidden Markov state machine
   - Hidden states: {stable, exploratory, adaptive, unstable}
-  - Observable emissions: multivariate Gaussian distribution (μ, Σ) per state
+  - Observable emissions: multivariate Gaussian distribution (μ, Σ) per state, with AR-1 temporal autocorrelation
   - Default 4×4 transition matrix encoding state dynamics
   - Factory functions: `make_agent()`, `make_agent_pool()`
-  - Key methods: `step()`, `simulate()`, `reset()`, state introspection methods
-  - Includes AR-1 temporal autocorrelation for realistic time series
+  - Key methods: `step()`, `simulate()`, `reset()`, `state_distribution()`, `transition_counts()`, `stationary_distribution()`
 
 - **`behavior_profiles.py`**
-  - `BehaviorProfile`: Immutable data container for each behavioral regime
-  - Canonical telemetry features (6 features):
-    - latency (ms)
-    - entropy (bits) 
-    - reward (a.u.)
-    - memory_usage (MB)
-    - error_rate ([0,1])
-    - action_freq (Hz)
-  - Pre-defined profiles for: stable, exploratory, adaptive, unstable
-  - Sampling method with AR-1 correlation
+  - `BehaviorProfile`: Frozen dataclass — statistical descriptor for one regime (means, stds, autocorr, description, color)
+  - Canonical telemetry features (6): latency (ms), entropy (bits), reward (a.u.), memory_usage (MB), error_rate ([0,1]), action_freq (Hz)
+  - `BehaviorProfile.sample()` — AR-1 correlated sampling; `.mahalanobis()` — distance to profile centroid
+  - `get_profile()`, `profile_distance_matrix()`, `regime_separability_ratio()`
 
-- **`environment.py`**, **`reward_dynamics.py`**, **`telemetry_generator.py`**
-  - Environment setup, reward signaling, and telemetry generation pipeline
+- **`telemetry_generator.py`**
+  - `TelemetryGenerator`: orchestrates a pool of `AdaptiveAgent`s — `.run()`, `.save()`/`.load()` (CSV round-trip), `.summary_statistics()`, `.state_frequencies()`, `.feature_matrix()`, `.labels()`
+  - `generate_and_save()` — one-shot helper
+
+- **`environment.py`, `reward_dynamics.py`** — thin/unused at the simulation layer; the real environment and reward-shaping logic that matters for this project lives in `src/rl/environment.py` and `src/rl/reward_dynamics.py` (see RL section)
 
 ---
 
-### 2. **Manifold Learning Module** (`src/manifold/`)
+### 2. **Telemetry Processing Module** (`src/telemetry/`) — implemented
+
+Raw simulation output → cleaned, normalized, windowed feature matrices.
+
+- **`preprocessing.py`** — `clip_features()` (physical-range clipping), `enforce_dtypes()`, `drop_incomplete()` (drop short agent sequences), `temporal_train_test_split()` (early/late split per agent), `to_feature_matrix()`
+- **`normalization.py`** — `ZScoreParams`/`MinMaxParams` dataclasses; `fit_zscore()`/`apply_zscore()`/`zscore_matrix()`, `fit_minmax()`/`apply_minmax()`, `normalize_scores()` (rescale anomaly scores to [0,1]), `zscore_dataframe()`
+- **`feature_extraction.py`** — `rolling_mean()`, `rolling_std()`, `temporal_diff()` (velocity), `composite_health_score()`, `augment_phase_space()`
+- **`statistics.py`** — `regime_summary()`, `fisher_separability()`, `anomaly_rate_by_regime()`, `per_agent_summary()`, `bhattacharyya_distance()`
+- **`windowing.py`** — `sliding_windows()`, `window_statistics()`, `reference_test_split()` (reference vs. test windows for drift detection), `per_agent_windows()`
+
+---
+
+### 3. **Manifold Learning Module** (`src/manifold/`) — implemented
+
 Dimensionality reduction and low-dimensional geometric analysis.
 
-- **`pca.py`** - Linear baseline
-  - `PCAResult`: Container for PCA analysis
-  - `fit_pca()`: Fit PCA with explained-variance diagnostics
-  - `regime_centroids_pca()`: Per-regime centroid computation
-  - `inter_regime_pc_distances()`: Pairwise distances in PC space
-  - `loading_dominance()`: Feature importance on principal components
-
-- **`umap_projection.py`** - Primary nonlinear embedding
-  - `UMAPResult`: Container for UMAP embedding
-  - `fit_umap()`: Single embedding (2D or 3D)
-  - `hyperparameter_sweep()`: Grid search over (n_neighbors, min_dist)
-  - `umap_per_regime_density()`: KDE density estimation
-  - `regime_connectivity()`: Quantifies boundary porosity (cross-regime edges)
-
-- **`tsne.py`** - Alternative nonlinear embedding
-  - Similar interface to UMAP for comparison
-
-- **`manifold_metrics.py`** - Quantitative evaluation
-  - `embedding_scorecard()`: Full suite of quality metrics:
-    - Silhouette coefficient (cluster separation)
-    - Davies-Bouldin index (compactness/separation)
-    - Calinski-Harabasz score (variance ratio)
-    - Trustworthiness (neighborhood preservation)
-    - Continuity (inverse trustworthiness)
-  - `compare_embeddings()`: Build comparison DataFrame
-
-- **`trajectory_geometry.py`**, **`covariance_analysis.py`**
-  - Geometric and statistical properties of trajectories in manifold
+- **`pca.py`** — `PCAResult` dataclass; `fit_pca()`, `regime_centroids_pca()`, `inter_regime_pc_distances()`, `loading_dominance()`, `print_pca_summary()`
+- **`umap_projection.py`** — `UMAPResult` dataclass; `fit_umap()`, `hyperparameter_sweep()` (grid search over n_neighbors/min_dist, scored by silhouette), `per_regime_density()` (KDE), `regime_connectivity()` (fraction of k-NN edges crossing regime boundaries)
+- **`tsne.py`** — `TSNEResult` dataclass; `fit_tsne()` (stratified subsample), `perplexity_sweep()`, `intra_regime_spread()`
+- **`manifold_metrics.py`** — `embedding_scorecard()` (silhouette, Davies-Bouldin, Calinski-Harabasz, trustworthiness, continuity), `compare_embeddings()`, `per_regime_silhouette()`, `embedding_agreement()` (Procrustes-based), `neighbourhood_purity()`
+- **`trajectory_geometry.py`** — `TrajectoryStats` dataclass; `extract_agent_trajectories()`, `compute_trajectory_stats()`, `transition_embedding_coords()`, `manifold_velocity()`, `regime_arc_statistics()`
+- **`covariance_analysis.py`** — **empty file** (no implementation)
 
 ---
 
-### 3. **HMM Module** (`src/hmm/`)
-Hidden Markov Model inference and state sequence analysis.
+### 4. **Hidden Markov Model Module** (`src/hmm/`) — implemented
 
-- **`hidden_state_model.py`**
-  - HMM fitting and inference on observed telemetry
-  - State sequence recovery/decoding
+Recovers the hidden state sequence from observed telemetry, purely unsupervised (ground truth used only for evaluation).
 
-- **`sequence_inference.py`**
-  - Viterbi algorithm or other inference methods
-
-- **`transition_analysis.py`**
-  - Transition matrix analysis and regime duration statistics
-
-- **`latent_state_metrics.py`**
-  - State-space diagnostics
+- **`hidden_state_model.py`** — `HMMResult` dataclass (model, `pred_raw`, `pred_aligned`, posteriors, Hungarian `mapping`, ARI, accuracy, log-likelihood, confusion matrix, convergence trace); `prepare_sequences()` (stack per-agent sequences for hmmlearn); `fit_hmm()` (Gaussian-emission HMM via Baum-Welch/EM, decoded via Viterbi)
+- **`sequence_inference.py`** — `model_selection_sweep()` (BIC/AIC across `n_components`), `stationary_distribution()`
+- **`transition_analysis.py`** — `transition_matrix_error()` (learned vs. ground-truth), `spectral_gap()`, `expected_dwell_times()`, `empirical_transition_counts()`
+- **`latent_state_metrics.py`** — `per_regime_accuracy()`, `per_agent_metrics()` (Hungarian-aligned per-agent ARI/accuracy), `posterior_entropy()`
 
 ---
 
-### 4. **Reinforcement Learning Module** (`src/rl/`)
-Agent adaptation and reinforcement-guided behavioral evolution.
+### 5. **Drift Detection Module** (`src/drift/`) — implemented
 
-- **`q_learning.py`** - Q-learning policy
-  - Standard Q-learning implementation
-  - State/action value approximation
+Three independent online/offline anomaly detectors plus regime-shift characterization — all evaluated against `hmm`-decoded ground truth changepoints.
 
-- **`policy.py`** - Policy representation
-  - Policy abstraction layer
-
-- **`exploration.py`** - Exploration strategies
-  - ε-greedy, softmax, or other exploration methods
-
-- **`reward_tracking.py`** - Reward accumulation
-  - Track cumulative rewards and learning curves
-
-- **`adaptation_dynamics.py`** - Behavioral adaptation
-  - How policies adapt over time
-  - Integration with manifold geometry
+- **`drift_detection.py`** — `HealthyEnvelope`/`MahalanobisResult` dataclasses; `fit_healthy_envelope()` (Gaussian fit on healthy-regime data), `mahalanobis_scores()`, `fit_mahalanobis()` (percentile-threshold flagging), `combined_anomaly_score()` (fuses Mahalanobis + EWMA), `threshold_sweep()` (precision/recall/F1/FPR across thresholds)
+- **`ewma.py`** — `EWMAResult` dataclass; `ewma_scores()`, `fit_ewma()` (adaptive threshold with warmup), `ewma_all_agents()`, `alpha_sweep()` (AUC across smoothing factors)
+- **`kl_divergence.py`** — `KLDriftResult` dataclass; `gaussian_kl()` (diagonal-covariance KL), `fit_reference()`, `kl_drift_scores()` (sliding-window KL vs. reference), `fit_kl_detector()`, `kl_all_agents()`, `window_size_sweep()`
+- **`regime_shift_analysis.py`** — `ground_truth_changepoints()`, `detection_latency()`/`detection_latency_summary()`, `shift_magnitude()`, `transition_shift_summary()`
 
 ---
 
-### 5. **Drift Detection Module** (`src/drift/`)
-Behavioral regime shift and distribution drift detection.
+### 6. **Reinforcement Learning Module** (`src/rl/`) — implemented
 
-- **`drift_detection.py`**
-  - Primary drift detection algorithms
-  - Detect regime transitions
+Tabular Q-learning over a discretized behavioral MDP, plus tooling to map training dynamics back onto the manifold/HMM/drift analyses from earlier notebooks.
 
-- **`regime_shift_analysis.py`**
-  - Analyze characteristics of regime shifts
-
-- **`kl_divergence.py`**
-  - KL divergence-based drift metrics
-
-- **`ewma.py`**
-  - Exponentially weighted moving average for drift tracking
+- **`environment.py`** — `BehavioralEnv`: MDP over `(latency, entropy)`-discretized state grid; `.reset()`/`.step()`/`.trajectory()`; `obs_to_grid()`/`grid_to_coords()`; actions nudge the agent's transition-matrix row (`_nudge_transition()`) toward stable or exploratory; `make_env_pool()`
+- **`q_learning.py`** — `QLearningConfig`, `EpisodeStats` dataclasses; `QLearningAgent` (`.train()`, `._select_action()` ε-greedy, `.greedy_action()`, `.evaluate()`, `.policy_map()`, `.value_map()`, `.training_dataframe()`); `train_agent_pool()`
+- **`policy.py`** — `greedy_policy()`, `policy_action_grid()`, `value_grid()`, `policy_entropy()`/`policy_entropy_grid()` (softmax policy entropy), `action_frequency_from_trajectory()`, `action_state_heatmap()`, `policy_agreement()`, `policy_summary_table()`
+- **`exploration.py`** — `EpsilonSchedule` dataclass (geometric/linear decay), `CuriosityBonus` class (count-based, β/√(N+1)), `geometric_epsilon()`/`linear_epsilon()`, `exploration_coverage()`, `state_coverage()`
+- **`reward_dynamics.py`** — `ManifoldPotential` (potential-based shaping Φ(x) = −‖(x−μ_healthy)/σ_healthy‖₂, γΦ(s′)−Φ(s)), `RewardCurriculum` dataclass (linearly ramps the unstable-state penalty over training), `decompose_episode_rewards()`, `reward_by_regime()`
+- **`reward_tracking.py`** — `smooth()`, `learning_curve_df()`, `pool_learning_curves()`, `convergence_episode()`/`convergence_table()`, `dwell_evolution_df()`, `regime_delta_table()`/`pool_regime_summary()`
+- **`adaptation_dynamics.py`** — `manifold_trajectory_stats()`, `cluster_migration_table()` (regime dwell fractions by training phase), `anomaly_score_evolution()`, `transition_entropy_series()` (proxy for HMM transition complexity over training), `umap_episode_centroids()`, `regime_novelty_score()`
 
 ---
 
-### 6. **Telemetry Processing Module** (`src/telemetry/`)
-Data pipeline for raw telemetry → feature vectors.
+### 7. **Evaluation Module** (`src/evaluation/`) — implemented
 
-- **`preprocessing.py`** - Data cleaning
-  - Missing value handling, outlier removal
+Cross-notebook metrics shared by manifold, HMM, and drift analyses.
 
-- **`normalization.py`** - Standardization
-  - Z-score normalization, min-max scaling
-
-- **`feature_extraction.py`** - Feature engineering
-  - Extract derived features from raw signals
-
-- **`statistics.py`** - Descriptive statistics
-  - Summary stats, distributions
-
-- **`windowing.py`** - Temporal windowing
-  - Rolling windows, sliding epochs
+- **`clustering_metrics.py`** — `clustering_scorecard()`, `per_class_silhouette()`, `ari_score()`
+- **`manifold_quality.py`** — `embedding_trustworthiness()`, `embedding_continuity()`, `neighbourhood_purity()`, `procrustes_agreement()`
+- **`explained_variance.py`** — `pca_explained_variance()`, `n_components_for_threshold()`, `intrinsic_dimensionality_estimate()` (participation-ratio estimate)
+- **`stability_metrics.py`** — `bootstrap_auc()`, `detector_stability_table()` (bootstrap AUC mean±std across detectors — used for drift-detector comparison)
+- **`trajectory_metrics.py`** — `path_length()`, `displacement()`, `tortuosity()`, `mean_speed()`, `trajectory_summary()`
 
 ---
 
-### 7. **Evaluation Module** (`src/evaluation/`)
-Quantitative metrics for experimental validation.
+### 8. **Visualization Module** (`src/visualization/`) — mostly empty
 
-- **`manifold_quality.py`** - Embedding quality
-  - Full pipeline for evaluating manifold embeddings
-
-- **`clustering_metrics.py`** - Cluster validation
-  - Silhouette, Davies-Bouldin, Calinski-Harabasz
-
-- **`trajectory_metrics.py`** - Trajectory properties
-  - Trajectory length, velocity, acceleration
-
-- **`stability_metrics.py`** - Temporal stability
-  - How stable regimes remain over time
-
-- **`explained_variance.py`** - Dimensionality assessment
-  - Variance explained by each dimension
+- **`manifold_plots.py`** — the *only* non-empty file, but it is a **one-off script**, not a reusable library: it hardcodes relative data paths (`../../data/raw/nb02/...`), builds one Plotly 3D UMAP scatter, and writes `src/visualization/lbsm_umap3d.html` as a side effect on import. Don't `import` it expecting functions.
+- `trajectory_plots.py`, `heatmaps.py`, `temporal_dynamics.py`, `state_transitions.py`, `dashboard.py` — **empty files**. All plotting actually happens inline inside the notebooks (matplotlib/seaborn/plotly), not through this module.
 
 ---
 
-### 8. **Visualization Module** (`src/visualization/`)
-Analysis and presentation graphics.
+### 9. **Utilities Module** (`src/utils/`) — empty
 
-- **`manifold_plots.py`** - Low-dimensional embeddings
-  - 2D/3D manifold scatter plots
-  - Color by regime, agent, time
-
-- **`trajectory_plots.py`** - Trajectory visualization
-  - Line plots in feature/manifold space
-
-- **`heatmaps.py`** - Matrix visualizations
-  - Transition matrix heatmaps, etc.
-
-- **`state_transitions.py`** - Regime dynamics
-  - Sankey/flow diagrams of state transitions
-
-- **`temporal_dynamics.py`** - Time series plots
-  - Feature evolution over time
-
-- **`dashboard.py`** - Summary dashboard
-  - Multi-panel analysis view
-
----
-
-### 9. **Utilities Module** (`src/utils/`)
-Infrastructure and helpers.
-
-- **`logging_utils.py`** - Logging setup
-- **`experiment_tracking.py`** - Experiment metadata and results tracking
-- **`io.py`** - File I/O (CSV, pickle, etc.)
-- **`random_seed.py`** - Reproducibility helpers
+`logging_utils.py`, `experiment_tracking.py`, `io.py`, `random_seed.py` are all **empty files**. There is no shared logging, experiment-tracking, or seed-management infrastructure yet — each notebook/module manages its own `np.random.default_rng(seed)` and file I/O inline.
 
 ---
 
 ## Data & Configuration
 
 ### Data Structure
-- **Processed datasets** (`data/processed/`)
-  - `nb01/telemetry_n20_t2000.csv`: 20 agents × 2000 timesteps
-  - `nb02/trajectory_stats.csv`, `nb02/transition_coords.csv`: Analysis results
+- **Raw arrays** (`data/raw/nbNN/`): `.npy` files per notebook (e.g. `nb01/X_telemetry.npy`, `nb03/hmm_posteriors.npy`, `nb04/composite_scores.npy`, `nb05/q_tables.npy`)
+- **Processed tables** (`data/processed/nbNN/`): `.csv` summaries per notebook (e.g. `nb02/trajectory_stats.csv`, `nb03/hmm_regime_accuracy.csv`, `nb05/rl_training_log.csv`)
+- Populated for nb01–nb05; no nb06/nb07 data yet (those notebooks are empty)
 
 ### Configuration Files
-- **`configs/`**:
-  - `simulation.yaml`: Agent simulation parameters
-  - `rl.yaml`: RL hyperparameters
-  - `telemetry.yaml`: Telemetry processing config
-  - `projection.yaml`: Manifold learning settings
-  - `experiments.yaml`: Experiment orchestration
+- **`configs/simulation.yaml`**, **`telemetry.yaml`**, **`projection.yaml`** — populated, actually referenced by the notebooks
+- **`configs/rl.yaml`**, **`configs/experiments.yaml`** — **empty files**; RL hyperparameters live in code defaults (`QLearningConfig`) instead
 
 ### Experiments
-- **`experiments/baseline/`**: Baseline simulation run
-- **`experiments/manifold/`**: Manifold learning pipeline
-- **`experiments/drift/`**: Drift detection experiments
-- **`experiments/rl_adaptive/`**: RL-driven adaptation
+- `experiments/{baseline,manifold,drift,rl_adaptive}/run_*.py` — **all four scripts are empty (0 lines)**. Each has a populated `config.yaml` sibling, but no script reads it yet. The actual end-to-end pipelines run inside the notebooks, not these scripts.
 
 ---
 
 ## Jupyter Notebooks (Research Pipeline)
 
-1. **`01_telemetry_generation.ipynb`** (2.5 MB)
-   - Simulate agents with hidden Markov state machine
-   - Generate raw telemetry data
-   - Visualize state dynamics and feature distributions
-
-2. **`02_manifold_learning.ipynb`** (4.1 MB)
-   - PCA baseline (linear projection)
-   - UMAP embedding (primary nonlinear method)
-   - t-SNE embedding (alternative)
-   - Quantitative quality metrics
-   - Manifold structure interpretation
-
-3. **`03_hmm_inference.ipynb`** (empty - planned)
-   - Recover hidden state sequence from telemetry
-   - Compare inferred vs. ground truth states
-
-4. **`04_anomaly_detection.ipynb`** (empty - planned)
-   - Detect behavioral anomalies
-   - Identify regime outliers in manifold
-
-5. **`05_rl_behavioral_evolution.ipynb`** (empty - planned)
-   - RL agent learning and policy adaptation
-   - Manifold trajectory of learning curve
-
-6. **`06_manifold_visualization.ipynb`** (empty - planned)
-   - Advanced 3D/interactive visualizations
-
-7. **`07_final_experiment_analysis.ipynb`** (empty - planned)
-   - Integrated analysis across all pipelines
+1. **`01_telemetry_generation.ipynb`** — populated. Simulate agents, generate raw telemetry, visualize state dynamics and feature distributions.
+2. **`02_manifold_learning.ipynb`** — populated. PCA baseline, UMAP (primary), t-SNE (alternative), quantitative quality metrics, manifold interpretation.
+3. **`03_hmm_inference.ipynb`** — populated. Recover hidden state sequence via Gaussian HMM (Baum-Welch/Viterbi), model-order selection (BIC), compare inferred vs. ground truth.
+4. **`04_anomaly_detection.ipynb`** — populated. EWMA / KL-divergence / Mahalanobis drift detectors, threshold sweeps, detection latency vs. ground-truth changepoints.
+5. **`05_rl_behavioral_evolution.ipynb`** — populated. Q-learning over `BehavioralEnv`, learning curves, regime-dwell evolution, manifold displacement/cluster migration during training.
+6. **`06_manifold_visualization.ipynb`** — **empty**, not started.
+7. **`07_final_experiment_analysis.ipynb`** — **empty**, not started.
 
 ---
 
@@ -277,26 +163,21 @@ Infrastructure and helpers.
 4. **Unstable**: High-variance, anomalous behavior
 
 ### Telemetry Features (Observable Emissions)
-6-dimensional feature vector per timestep:
-- Latency, Entropy, Reward, Memory Usage, Error Rate, Action Frequency
+6-dimensional feature vector per timestep: Latency, Entropy, Reward, Memory Usage, Error Rate, Action Frequency.
 
 ### Emission Model
-- Each regime generates telemetry from multivariate Gaussian:
-  - x_t ~ N(μ_{s_t}, Σ_{s_t}) where s_t is hidden state
-  - Diagonal covariance (feature independence within regime)
-  - AR-1 temporal correlation (ρ ≈ 0.3) for realistic smoothness
+- Each regime generates telemetry from a multivariate Gaussian: x_t ~ N(μ_{s_t}, Σ_{s_t}), diagonal covariance, with AR-1 temporal correlation (ρ ≈ 0.3) for realistic smoothness.
 
 ### Manifold Hypothesis
-- Despite 6-dimensional feature space, true behavioral structure lies in ≤3-D manifold
-- Nonlinear embeddings (UMAP) should reveal regime topology
-- Manifold geometry encodes behavioral similarity and transition structure
+- Despite 6-dimensional feature space, true behavioral structure lies in ≤3-D manifold; UMAP should reveal regime topology.
 
 ### Markov Chain Dynamics
-- Default transition matrix (state-to-state probabilities):
-  - Stable → mostly stable (0.75), some exploratory (0.15)
-  - Exploratory → adaptive (0.30) or exploratory (0.55)
-  - Adaptive → stable (0.30) or adaptive (0.50)
-  - Unstable → self-loop (0.70) or recovery to other states
+- Default transition matrix: Stable→stable (0.75)/exploratory (0.15); Exploratory→adaptive (0.30)/exploratory (0.55); Adaptive→stable (0.30)/adaptive (0.50); Unstable→self-loop (0.70).
+
+### RL-specific concepts
+- **Potential-based reward shaping**: `ManifoldPotential` defines Φ(x) as negative normalized distance to the healthy-regime centroid; shaping bonus is γΦ(s′) − Φ(s), which provably doesn't change the optimal policy.
+- **Reward curriculum**: `RewardCurriculum` linearly ramps the unstable-state penalty over training episodes rather than fixing it, to avoid punishing early exploration.
+- **Manifold-aware RL evaluation**: training success is judged not just by reward but by whether learning trajectories move through/reshape the manifold structure discovered in nb02, reduce HMM transition entropy (nb03), and produce anomalies under the nb04 detectors that later stabilize into new clusters.
 
 ---
 
@@ -305,74 +186,87 @@ Infrastructure and helpers.
 - **Core Scientific**: NumPy, SciPy, scikit-learn
 - **Data**: Pandas
 - **Manifold Learning**: UMAP-learn, scikit-learn (t-SNE, PCA)
+- **Sequence Modeling**: hmmlearn (Gaussian HMM)
 - **Visualization**: Matplotlib, Seaborn, Plotly
 - **Jupyter**: JupyterLab, notebook
-- **Environment**: Nix flakes (multi-system support)
+- **Environment**: Nix flakes (`flake.nix`, Python 3.13 + SageMath, canonical) / conda (`environment.yml`, Python 3.12, fallback)
+- **Statistics track**: R (`r/statistics`, `r/visualization`, `r/reports`) — independent of the Python pipeline, run manually
 - **Version Control**: Git
 
 ---
 
 ## Project Status
 
-- **Mature**: Simulation & telemetry generation (Notebook 01)
-- **Mature**: Manifold learning & analysis (Notebook 02)
-- **Planned**: HMM inference, anomaly detection, RL integration
-- **Tests**: Empty test files (no unit tests yet)
-- **Docs**: Jupyter notebooks as primary documentation + Obsidian notes
+- **Implemented**: simulation, telemetry, manifold, hmm, drift, rl, evaluation — real, working code
+- **Stubbed**: visualization (one non-reusable script + 5 empty files), utils (all empty)
+- **Tests**: 2 of 6 test files have real assertions (`test_simulation.py`, `test_manifold.py`); the other 4 (drift, hmm, metrics, projection, rl) are empty despite their modules being implemented
+- **Docs**: Jupyter notebooks are the primary active research documents; this `docs/references/` set is a secondary index kept in sync manually — if you notice it drifting from the code again, update it
 
 ---
 
 ## Code Organization Principles
 
-1. **Modular design**: Each module handles one concern (simulation, manifold, HMM, etc.)
-2. **Result containers**: Use dataclasses (e.g., `PCAResult`, `UMAPResult`) for complex outputs
-3. **Reproducibility**: Random seeds embedded throughout
+1. **Modular design**: Each module handles one concern (simulation, manifold, HMM, drift, RL, evaluation)
+2. **Result containers**: Dataclasses for complex outputs (`PCAResult`, `UMAPResult`, `HMMResult`, `EWMAResult`, `KLDriftResult`, `MahalanobisResult`, `TrajectoryStats`, `EpisodeStats`)
+3. **Reproducibility**: Random seeds embedded throughout (`rng_seed`, `base_seed`, `random_state=42`)
 4. **Type hints**: Full type annotations in core functions
-5. **Docstrings**: NumPy-style docstrings with references to paper sections
-6. **Factory functions**: Convenience builders (e.g., `make_agent()`, `make_agent_pool()`)
+5. **Docstrings**: NumPy-style docstrings, several referencing paper sections
+6. **Factory functions**: `make_agent()`, `make_agent_pool()`, `make_env_pool()`, `train_agent_pool()`
+7. **Sweep functions**: Hyperparameter/threshold search that returns a scored DataFrame (`hyperparameter_sweep`, `model_selection_sweep`, `alpha_sweep`, `window_size_sweep`, `threshold_sweep`) — the dominant pattern for model selection across every analysis branch
 
 ---
 
 ## Entry Points
 
-- **Simulations**: `src/simulation/agent.py::AdaptiveAgent`
-- **Analysis**: Jupyter notebooks (Notebooks 01-02)
-- **Experiments**: `experiments/{baseline,manifold,drift,rl_adaptive}/run_*.py`
-- **Testing**: `tests/test_*.py` (currently empty)
+- **Simulations**: `src/simulation/agent.py::AdaptiveAgent`, `src/simulation/telemetry_generator.py::TelemetryGenerator`
+- **Analysis**: Jupyter notebooks (Notebooks 01–05; 06–07 not started)
+- **Experiments**: `experiments/{baseline,manifold,drift,rl_adaptive}/run_*.py` exist as placeholders but are currently empty — don't rely on them
+- **Testing**: `tests/test_simulation.py`, `tests/test_manifold.py` (real); the other 4 `tests/test_*.py` are empty
 
 ---
 
 ## Knowledge Gaps for Future Work
 
-1. **HMM inference**: Hidden state recovery from observed telemetry
-2. **Drift detection**: Quantifying behavioral regime shifts over time
-3. **RL integration**: How learning dynamics map to manifold geometry
-4. **Anomaly detection**: Outlier detection in learned manifold
-5. **Statistical rigor**: Formal hypothesis testing for manifold structure
-6. **Scalability**: Handling N > 100K agents or T > 100K timesteps
-
----
-
-## Repository Metadata
-
-- **Main branch**: `main`
-- **Remote**: `origin` → GitHub SSH
-- **Git history**: 20+ commits with gradual development
-- **License**: File present but empty (check Git)
-- **Makefile**: Present but empty
-- **Setup.cfg**: Present but empty
-- **Pyproject.toml**: Present but empty
+1. **Visualization module**: turn `manifold_plots.py` and friends into a reusable plotting library instead of ad-hoc notebook cells / one-off scripts
+2. **Utils module**: no shared logging, experiment tracking, seed management, or I/O helpers yet
+3. **Experiment scripts**: `experiments/*/run_*.py` need actual implementations if they're meant to be CLI-runnable alternatives to the notebooks
+4. **Test coverage**: drift, hmm, rl, evaluation (metrics), and manifold-projection modules have no tests despite being fully implemented
+5. **Notebooks 06–07**: interactive 3D visualization and final cross-pipeline analysis not started
+6. **Scalability**: handling N > 100K agents or T > 100K timesteps
 
 ---
 
 ## Summary
 
-This is a **research codebase** for investigating low-dimensional behavioral manifolds in adaptive systems. The core innovation is showing that high-dimensional telemetry from adaptive agents can be **compressed into low-dimensional manifolds** that reveal **interpretable behavioral structure**. The codebase emphasizes:
+This is a **research codebase** for investigating low-dimensional behavioral manifolds in adaptive systems. The core innovation is showing that high-dimensional telemetry from adaptive agents can be **compressed into low-dimensional manifolds** that reveal **interpretable behavioral structure**, and that this structure survives — and interacts with — probabilistic state inference (HMM), online drift detection, and reinforcement-learning-driven behavioral adaptation. Five of seven notebooks and seven of nine `src/` packages are implemented; the remaining gaps are visualization tooling, shared infrastructure (`utils/`), test coverage for the newer modules, and the standalone experiment scripts.
 
-- **Rigorous simulation** of ground-truth hidden state dynamics
-- **Multiple manifold learning methods** (PCA, UMAP, t-SNE) with quantitative comparison
-- **Reproducibility** through random seeds and configuration management
-- **Jupyter notebooks** as active research documents with integrated analysis
-- **Modular architecture** supporting extension to HMM, RL, and anomaly detection
+---
 
-The research hypothesis is being validated through increasingly sophisticated experiments that connect observable telemetry to latent geometric structure.
+## How these docs were verified (and how to re-verify)
+
+As of the last refresh, implementation status was checked directly against the code rather than assumed from file/directory names:
+
+```bash
+# Which files are actually empty?
+find src -name "*.py" -not -path "*__pycache__*" -empty
+
+# Real function/class signatures + first docstring line, per module:
+python3 -c "
+import ast, glob
+for f in sorted(glob.glob('src/*/*.py')):
+    if '__pycache__' in f or f.endswith('__init__.py'): continue
+    tree = ast.parse(open(f).read())
+    print(f)
+    for n in tree.body:
+        if isinstance(n, ast.FunctionDef):
+            print(' def', n.name)
+"
+
+# Which tests are non-empty?
+wc -l tests/*.py
+
+# Which notebooks/experiment scripts/configs are non-empty?
+ls -la notebooks/*.ipynb; wc -l experiments/*/*.py configs/*.yaml
+```
+
+If these commands show different results than what's written above, this file (and its siblings in `docs/references/`) is stale — trust the code, and please update the docs.

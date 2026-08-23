@@ -8,36 +8,38 @@ flowchart TD
     classDef sim   fill:#6c3483,stroke:#c39bd3,color:#f9e4ff,stroke-width:1.5px
     classDef tel   fill:#1a5276,stroke:#5dade2,color:#d6eaf8,stroke-width:1.5px
     classDef man   fill:#0b5345,stroke:#52be80,color:#d5f5e3,stroke-width:1.5px
-    classDef viz   fill:#784212,stroke:#f0b27a,color:#fdebd0,stroke-width:1.5px
+    classDef viz   fill:#3a3a3a,stroke:#888,color:#ccc,stroke-width:1px,stroke-dasharray:5 5
     classDef eval  fill:#78281f,stroke:#ec7063,color:#fdedec,stroke-width:1.5px
 
     subgraph SIM["🧬  SIMULATION LAYER"]
         BP["BehaviorProfile\nμ · Σ · ρ"]:::sim
         AA["AdaptiveAgent\n4 hidden states · Markov + AR-1"]:::sim
         OPS["step() · simulate() · reset()"]:::sim
-        FAC["make_agent() / make_agent_pool()"]:::sim
+        FAC["make_agent() / make_agent_pool()\nTelemetryGenerator"]:::sim
     end
 
     subgraph TEL["⚙️  TELEMETRY PROCESSING LAYER"]
-        PRE["preprocessing.py\nnulls · outliers"]:::tel
-        NORM["normalization.py · Z-score"]:::tel
-        FEAT["feature_extraction.py\nderive features"]:::tel
+        PRE["preprocessing.py\nclip_features · drop_incomplete"]:::tel
+        NORM["normalization.py · zscore/minmax"]:::tel
+        FEAT["feature_extraction.py\nrolling stats · temporal_diff"]:::tel
         AUX["windowing.py · statistics.py"]:::tel
     end
 
     subgraph MAN["🔭  MANIFOLD LEARNING LAYER"]
         PCA["fit_pca()\nPCAResult · linear baseline"]:::man
         UMAP["fit_umap()\nUMAPResult · primary nonlinear"]:::man
-        TSNE["fit_tsne()\nalternative"]:::man
+        TSNE["fit_tsne()\nTSNEResult · stratified subsample"]:::man
+        TRAJ["trajectory_geometry.py\nTrajectoryStats"]:::man
     end
 
-    subgraph VIZ["📊  VISUALIZATION LAYER"]
-        VCORE["manifold_plots · trajectory_plots\nheatmaps · temporal_dynamics\nstate_transitions · dashboard"]:::viz
+    subgraph VIZ["📊  VISUALIZATION LAYER — mostly empty"]
+        VCORE["manifold_plots.py\n(one-off script, not a library)"]:::viz
+        VSTUB["trajectory_plots · heatmaps\ntemporal_dynamics · state_transitions\ndashboard  — EMPTY FILES"]:::viz
     end
 
     subgraph EVAL["🧪  EVALUATION LAYER"]
         SCORE["embedding_scorecard()\nsilhouette · davies-bouldin\ncalinski-harabasz · trustworthiness · continuity"]:::eval
-        CMP["PCA vs UMAP\ncomparison table"]:::eval
+        CMP["compare_embeddings()\nPCA vs UMAP vs t-SNE"]:::eval
     end
 
     BP --> AA --> OPS
@@ -46,6 +48,7 @@ flowchart TD
     PRE --> NORM --> FEAT
     AUX --> FEAT
     FEAT -->|"feature matrix N×6"| MAN
+    PCA & UMAP & TSNE --> TRAJ
     PCA & UMAP & TSNE -->|"2-D / 3-D embeddings"| VCORE
     PCA & UMAP & TSNE -->|"X + embedded X"| SCORE
     SCORE --> CMP
@@ -53,7 +56,7 @@ flowchart TD
 
 ---
 
-## 2 · Parallel analysis branches (planned)
+## 2 · Parallel analysis branches — all implemented
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1e1e2e", "primaryTextColor": "#ffffff", "primaryBorderColor": "#555", "lineColor": "#ffffff", "secondaryColor": "#2a2a2a", "tertiaryColor": "#2a2a2a", "background": "#0d0d0d", "mainBkg": "#2a2a2a", "nodeBorder": "#555", "clusterBkg": "#2a2a2a", "clusterBorder": "#555555", "titleColor": "#ffffff", "edgeLabelBackground": "#1a1a1a", "fontFamily": "monospace"}}}%%
@@ -62,28 +65,30 @@ flowchart LR
     classDef drift fill:#0e3b2e,stroke:#48c9b0,color:#a2d9ce,stroke-width:1.5px
     classDef rl    fill:#4a235a,stroke:#c39bd3,color:#e8daef,stroke-width:1.5px
 
-    subgraph HMM["🧠  HMM LAYER — planned"]
-        H1["hidden_state_model.py\nForward · Backward · Viterbi"]:::hmm
-        H2["sequence_inference.py\nstate recovery"]:::hmm
-        H3["transition_analysis.py\nempirical transition matrix"]:::hmm
-        H4["latent_state_metrics.py\nstate-space diagnostics"]:::hmm
+    subgraph HMM["🧠  HMM LAYER"]
+        H1["hidden_state_model.py\nfit_hmm(): Baum-Welch/EM + Viterbi\n→ HMMResult"]:::hmm
+        H2["sequence_inference.py\nmodel_selection_sweep() BIC/AIC"]:::hmm
+        H3["transition_analysis.py\ntransition_matrix_error · spectral_gap"]:::hmm
+        H4["latent_state_metrics.py\nper_agent_metrics (Hungarian-aligned)"]:::hmm
         H1 --> H2 --> H3 --> H4
     end
 
-    subgraph DRIFT["📉  DRIFT LAYER — planned"]
-        D1["drift_detection.py\ndetection algorithms"]:::drift
-        D2["regime_shift_analysis.py\ncharacterise shift events"]:::drift
-        D3["kl_divergence.py · ewma.py"]:::drift
+    subgraph DRIFT["📉  DRIFT LAYER"]
+        D1["drift_detection.py\nfit_mahalanobis() · combined_anomaly_score()"]:::drift
+        D2["regime_shift_analysis.py\nground_truth_changepoints · detection_latency"]:::drift
+        D3["ewma.py · kl_divergence.py\nfit_ewma() · fit_kl_detector()"]:::drift
         D1 --> D2
         D3 --> D2
     end
 
-    subgraph RL["🤖  RL LAYER — planned"]
-        R1["q_learning.py\nQ-learning policy"]:::rl
-        R2["policy.py · exploration.py"]:::rl
-        R3["reward_tracking.py\ncumulative rewards"]:::rl
-        R4["adaptation_dynamics.py\nlearning → manifold geometry"]:::rl
-        R1 --> R2 --> R3 --> R4
+    subgraph RL["🤖  RL LAYER"]
+        R1["environment.py\nBehavioralEnv MDP"]:::rl
+        R2["q_learning.py\nQLearningAgent.train()"]:::rl
+        R3["reward_dynamics.py\nManifoldPotential · RewardCurriculum"]:::rl
+        R4["adaptation_dynamics.py\nmanifold_trajectory_stats · cluster_migration"]:::rl
+        R1 --> R2
+        R3 --> R2
+        R2 --> R4
     end
 ```
 
@@ -99,27 +104,29 @@ graph TD
     classDef analysis   fill:#0b5345,stroke:#52be80,color:#d5f5e3,stroke-width:1.5px
     classDef validation fill:#7d6608,stroke:#f9e79f,color:#fef9e7,stroke-width:1.5px
     classDef present    fill:#78281f,stroke:#ec7063,color:#fdedec,stroke-width:1.5px
-    classDef planned    fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
+    classDef empty      fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
     classDef infra      fill:#1c2833,stroke:#566573,color:#aab7b8,stroke-width:1px
 
-    SIM["simulation/\nagent · profiles · environment\nreward_dynamics · telemetry_generator"]:::foundation
+    SIM["simulation/\nagent · profiles · telemetry_generator"]:::foundation
     TEL["telemetry/\npreprocessing · normalization\nfeature_extraction · stats · windowing"]:::pipeline
-    MAN["manifold/\npca · umap_projection · tsne\nmanifold_metrics · trajectory_geometry\ncovariance_analysis"]:::analysis
+    MAN["manifold/\npca · umap_projection · tsne\nmanifold_metrics · trajectory_geometry\n(covariance_analysis.py EMPTY)"]:::analysis
     EVA["evaluation/\nmanifold_quality · clustering_metrics\ntrajectory_metrics · stability · explained_var"]:::validation
-    VIZ["visualization/\nmanifold_plots · trajectory_plots\nheatmaps · temporal_dynamics\nstate_transitions · dashboard"]:::present
-    HMM["hmm/  ⏳\nhidden_state_model · sequence_inference\ntransition_analysis · latent_state_metrics"]:::planned
-    DRI["drift/  ⏳\ndrift_detection · regime_shift_analysis\nkl_divergence · ewma"]:::planned
-    RLM["rl/  ⏳\nq_learning · policy · exploration\nreward_tracking · adaptation_dynamics"]:::planned
-    UTL["utils/\nlogging · experiment_tracking · io · seed"]:::infra
+    VIZ["visualization/  ⚠️ mostly empty\nmanifold_plots (one-off script)\n5 other files EMPTY"]:::empty
+    HMM["hmm/\nhidden_state_model · sequence_inference\ntransition_analysis · latent_state_metrics"]:::analysis
+    DRI["drift/\ndrift_detection · regime_shift_analysis\nkl_divergence · ewma"]:::analysis
+    RLM["rl/\nenvironment · q_learning · policy\nexploration · reward_dynamics\nreward_tracking · adaptation_dynamics"]:::analysis
+    UTL["utils/  ⚠️ all empty\nlogging · experiment_tracking · io · seed"]:::empty
 
     SIM -->|"raw telemetry"| TEL
     TEL -->|"feature matrix"| MAN
     MAN -->|"embeddings"| EVA
-    MAN -->|"embeddings"| VIZ
-    TEL -.->|"planned"| HMM
-    TEL -.->|"planned"| DRI
-    MAN -.->|"planned"| RLM
-    UTL --> SIM & TEL & MAN & EVA
+    MAN -.->|"one-off script"| VIZ
+    TEL --> HMM
+    TEL --> DRI
+    MAN --> RLM
+    HMM --> DRI
+    RLM --> EVA
+    UTL -.->|"not actually used"| SIM & TEL & MAN & EVA
 ```
 
 ---
@@ -135,7 +142,9 @@ sequenceDiagram
     participant T  as 📡 Telemetry Store
     participant P  as ⚙️ Preprocessor
     participant E  as 🔭 Embedder
-    participant V  as 📊 Visualiser
+    participant H  as 🧠 HMM
+    participant D  as 📉 Drift
+    participant R  as 🤖 RL
     participant Q  as 🧪 Evaluator
 
     rect rgb(60,20,80)
@@ -147,51 +156,54 @@ sequenceDiagram
     end
 
     rect rgb(10,40,70)
-        Note over P,Q: Analysis pipeline
+        Note over P,Q: Analysis pipeline (nb01-02)
         T  ->> P:  feature matrix X (N×6)
-        P  ->> P:  normalise · handle missing data
+        P  ->> P:  normalise · window · handle missing data
         P  ->> E:  fit PCA, UMAP, t-SNE
         E  ->> Q:  silhouette · Davies-Bouldin · trustworthiness
-        E  ->> V:  2D/3D scatter · trajectories · heatmaps
     end
 
     rect rgb(10,50,35)
-        Note over A,Q: Planned downstream
-        T  -->> SM: HMM — infer hidden state
-        T  -->> P:  Drift — detect regime shifts
-        E  -->> A:  RL — modify policies
-        E  -->> Q:  Anomaly — outliers in manifold
+        Note over T,R: Downstream branches (nb03-05) — all implemented
+        T  ->> H:  fit_hmm() — recover hidden state sequence
+        H  ->> Q:  ARI · per-agent accuracy vs ground truth
+        T  ->> D:  EWMA + KL + Mahalanobis anomaly scoring
+        H  ->> D:  ground-truth changepoints for latency evaluation
+        E  ->> R:  BehavioralEnv trains against manifold-derived reward shaping
+        R  ->> Q:  learning curves · manifold trajectory stats
     end
 ```
 
 ---
 
-## 5 · Experiment pipeline
+## 5 · Experiment pipeline — scripts are placeholders (empty)
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1e1e2e", "primaryTextColor": "#ffffff", "primaryBorderColor": "#555", "lineColor": "#ffffff", "secondaryColor": "#2a2a2a", "tertiaryColor": "#2a2a2a", "background": "#0d0d0d", "mainBkg": "#2a2a2a", "nodeBorder": "#555", "clusterBkg": "#2a2a2a", "clusterBorder": "#555555", "titleColor": "#ffffff", "edgeLabelBackground": "#1a1a1a", "fontFamily": "monospace"}}}%%
 flowchart LR
-    classDef entry fill:#1a3a5c,stroke:#5dade2,color:#aed6f1,stroke-width:1.5px
-    classDef step  fill:#1c2833,stroke:#566573,color:#aab7b8,stroke-width:1px
-    classDef out   fill:#0b5345,stroke:#52be80,color:#d5f5e3,stroke-width:1.5px
-    classDef plan  fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
+    classDef entry fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
+    classDef step  fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
+    classDef out   fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
+    classDef notebook fill:#0b5345,stroke:#52be80,color:#d5f5e3,stroke-width:1.5px
 
-    subgraph BASE["🧪 baseline/"]
-        B1["run_baseline.py"]:::entry --> B2["generate\nagents"]:::step --> B3["simulate\ntelemetry"]:::step --> B4["save CSV"]:::out
+    subgraph BASE["🧪 baseline/  — run_baseline.py: 0 lines"]
+        B1["intended:\ngenerate agents"]:::entry --> B2["simulate\ntelemetry"]:::step --> B3["save CSV"]:::out
     end
-    subgraph PROJ["🔭 manifold/"]
-        M1["run_projection_experiment.py"]:::entry --> M2["load\ntelemetry"]:::step --> M3["PCA / UMAP\n/ t-SNE"]:::step --> M4["evaluate\nmetrics"]:::step --> M5["visualise"]:::out
+    subgraph PROJ["🔭 manifold/  — run_projection_experiment.py: 0 lines"]
+        M1["intended:\nload telemetry"]:::entry --> M2["PCA / UMAP\n/ t-SNE"]:::step --> M3["evaluate\nmetrics"]:::out
     end
-    subgraph DEXP["📉 drift/  ⏳"]
-        D1["run_drift_experiment.py"]:::plan --> D2["detect\nregime shifts"]:::plan --> D3["analyse\ndrift"]:::plan
+    subgraph DEXP["📉 drift/  — run_drift_experiment.py: 0 lines"]
+        D1["intended:\ndetect regime shifts"]:::entry --> D2["analyse\ndrift"]:::out
     end
-    subgraph RLEXP["🤖 rl_adaptive/  ⏳"]
-        R1["run_rl_experiment.py"]:::plan --> R2["agent\nlearning"]:::plan --> R3["track manifold\ntrajectory"]:::plan --> R4["measure\nadaptation"]:::plan
+    subgraph RLEXP["🤖 rl_adaptive/  — run_rl_experiment.py: 0 lines"]
+        R1["intended:\nagent learning"]:::entry --> R2["track manifold\ntrajectory"]:::out
     end
 
-    BASE -->|"CSV telemetry"| PROJ
-    BASE -.->|"planned"| DEXP
-    BASE -.->|"planned"| RLEXP
+    REAL["✅ Real pipelines actually run here:\nnotebooks/01-05_*.ipynb"]:::notebook
+    BASE -.->|"not wired up"| REAL
+    PROJ -.->|"not wired up"| REAL
+    DEXP -.->|"not wired up"| REAL
+    RLEXP -.->|"not wired up"| REAL
 ```
 
 ---
@@ -202,15 +214,15 @@ flowchart LR
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1e1e2e", "primaryTextColor": "#ffffff", "primaryBorderColor": "#555", "lineColor": "#ffffff", "secondaryColor": "#2a2a2a", "tertiaryColor": "#2a2a2a", "background": "#0d0d0d", "mainBkg": "#2a2a2a", "nodeBorder": "#555", "clusterBkg": "#2a2a2a", "clusterBorder": "#555555", "titleColor": "#ffffff", "edgeLabelBackground": "#1a1a1a", "fontFamily": "monospace"}}}%%
 flowchart TD
     classDef active  fill:#1a5276,stroke:#5dade2,color:#d6eaf8,stroke-width:2px
-    classDef planned fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
+    classDef empty fill:#1a1a1a,stroke:#444,color:#888,stroke-width:1px,stroke-dasharray:5 5
 
     N1["📓 01 · telemetry generation\nSimulation → telemetry → state dynamics viz"]:::active
     N2["📓 02 · manifold learning\nPCA / UMAP / t-SNE · manifold quality · interpretation"]:::active
-    N3["📓 03 · HMM inference  ⏳\nstate sequence recovery · Viterbi decoding"]:::planned
-    N4["📓 04 · anomaly detection  ⏳\noutlier detection in manifold space"]:::planned
-    N5["📓 05 · RL behavioural evolution  ⏳\nlearning trajectories · adaptation dynamics"]:::planned
-    N6["📓 06 · manifold visualisation  ⏳\n3-D interactive visualisations"]:::planned
-    N7["📓 07 · final experiment analysis  ⏳\nintegrated cross-pipeline analysis"]:::planned
+    N3["📓 03 · HMM inference\nGaussian HMM (Baum-Welch/Viterbi) · BIC selection · GT comparison"]:::active
+    N4["📓 04 · anomaly detection\nEWMA / KL / Mahalanobis · threshold sweeps · detection latency"]:::active
+    N5["📓 05 · RL behavioural evolution\nQ-learning · learning curves · manifold/cluster migration"]:::active
+    N6["📓 06 · manifold visualisation  — EMPTY, not started"]:::empty
+    N7["📓 07 · final experiment analysis  — EMPTY, not started"]:::empty
 
     N1 --> N2 --> N3 --> N4 --> N5 --> N6 --> N7
 ```
