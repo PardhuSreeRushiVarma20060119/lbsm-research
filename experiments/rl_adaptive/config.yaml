@@ -1,0 +1,36 @@
+# RL-adaptive experiment.
+# Same values as configs/rl.yaml, duplicated here so this experiment runs
+# standalone without reaching outside its own directory. If you change
+# hyperparameters, update both files (or point this at ../../configs/rl.yaml
+# once experiments/*/run_*.py grows a shared-config loader).
+
+environment:
+  n_grid_latency: 10
+  n_grid_entropy: 10
+  n_steps_per_episode: 500
+  delta_base: 0.02
+
+q_learning:
+  alpha: 0.15
+  gamma: 0.95
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay: 0.97
+  n_episodes: 120
+  seed: 42
+
+pool:
+  n_envs: 20
+  base_seed: 42
+
+evaluation:
+  n_eval_episodes: 10
+  n_baseline_episodes: 20
+
+healthy_envelope:
+  healthy_regimes: [stable, exploratory, adaptive]
+  regularize: 1.0e-6
+
+output:
+  q_tables_npy: data/raw/nb05/q_tables.npy
+  training_log_csv: data/processed/nb05/rl_training_log.csv

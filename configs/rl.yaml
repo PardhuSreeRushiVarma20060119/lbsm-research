@@ -1,0 +1,44 @@
+# RL layer configuration (src/rl/).
+# Values below match what NB05 (05_rl_behavioral_evolution.ipynb) actually
+# ran with, after the causal-alignment fix documented in that notebook's
+# §3.2 / outputs/reports/nb05 — not aspirational defaults.
+
+environment:
+  n_grid_latency: 10          # BehavioralEnv N_GRID_LATENCY
+  n_grid_entropy: 10          # BehavioralEnv N_GRID_ENTROPY
+  n_steps_per_episode: 500    # BehavioralEnv N_STEPS_PER_EPISODE
+  delta_base: 0.02            # BehavioralEnv DELTA_BASE — cumulative transition-matrix nudge magnitude
+  reward:
+    healthy: 1.0               # R_HEALTHY
+    unstable: -2.0              # R_UNSTABLE
+    exit_bonus: 3.0             # R_EXIT, one-time bonus on leaving `unstable`
+
+q_learning:
+  alpha: 0.15                 # learning rate
+  gamma: 0.95                 # discount factor
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay: 0.97         # multiplicative, per episode
+  n_episodes: 120
+  seed: 42
+
+pool:
+  n_envs: 20                  # matches the NB01–04 agent-pool size
+  base_seed: 42                # per-env seed = base_seed + i
+
+evaluation:
+  n_eval_episodes: 10          # greedy (epsilon=0) post-training evaluation episodes per agent
+  n_baseline_episodes: 20      # independent random-policy baseline episodes (evidence-checklist C1/C2)
+
+# Reward shaping (src/rl/reward_dynamics.py: ManifoldPotential, RewardCurriculum) is
+# implemented but was NOT used in the NB05 training run above — the environment's
+# raw +1/-2/+3 reward was used unshaped. Left here as a documented, opt-in extension
+# point for future notebooks/experiments rather than silently unused code.
+reward_shaping:
+  enabled: false
+  manifold_potential:
+    shaping_coeff: 1.0
+  reward_curriculum:
+    r_unstable_start: -0.5
+    r_unstable_final: -2.0
+    n_warmup_episodes: 30

@@ -1,0 +1,24 @@
+# Manifold learning experiment.
+# Mirrors configs/projection.yaml; kept standalone for this experiment script.
+
+input:
+  telemetry_csv: data/processed/nb01/telemetry_n20_t2000.csv
+
+pca:
+  n_components: 6   # capped at the feature count (6); fit_pca has no components to spare beyond that
+  random_state: 42
+
+umap:
+  n_components: 2
+  n_neighbors: 30
+  min_dist: 0.1
+  random_state: 42
+
+tsne:
+  n_components: 2
+  perplexity: 30
+  random_state: 42
+
+output:
+  scorecard_csv: data/processed/nb02/embedding_scorecard.csv
+  trajectory_stats_csv: data/processed/nb02/trajectory_stats.csv

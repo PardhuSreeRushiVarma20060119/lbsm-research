@@ -1,0 +1,29 @@
+# Drift detection experiment.
+# Parameters match the protocol established in NB04 (outputs/reports/nb04).
+
+input:
+  telemetry_csv: data/processed/nb01/telemetry_n20_t2000.csv
+
+healthy_envelope:
+  healthy_regimes: [stable, exploratory, adaptive]
+  regularize: 1.0e-6
+  test_frac: 0.20   # temporal train/test split fraction (per agent)
+
+mahalanobis:
+  threshold_pct: 97.5
+
+ewma:
+  alpha: 0.02
+  threshold_k: 3.0
+  warmup: 50
+
+kl_divergence:
+  window_size: 20
+  step: 5
+  threshold_k: 3.0
+  warmup_frac: 0.1
+
+output:
+  composite_scores_npy: data/raw/nb04/composite_scores.npy
+  detection_latency_csv: data/processed/nb04/detection_latency.csv
+  threshold_sweep_csv: data/processed/nb04/threshold_sweep.csv

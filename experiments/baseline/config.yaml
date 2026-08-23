@@ -1,0 +1,15 @@
+# Baseline telemetry generation experiment.
+# Mirrors configs/simulation.yaml; kept standalone here so this experiment
+# script doesn't have to reach outside its own directory to run.
+
+simulation:
+  n_agents: 20
+  n_timesteps: 2000
+  initial_states: [stable, exploratory, adaptive, unstable]
+  transition_matrix: null   # use DEFAULT_TRANSITION_MATRIX
+  random_seed: 42
+
+output:
+  telemetry_csv: data/processed/nb01/telemetry_n20_t2000.csv
+  feature_matrix_npy: data/raw/nb01/X_telemetry.npy
+  labels_npy: data/raw/nb01/y_labels.npy

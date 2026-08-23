@@ -1,0 +1,36 @@
+# Orchestration config for experiments/*/run_*.py.
+# Each stage's own experiments/<name>/config.yaml holds stage-specific
+# parameters; this file only sequences the stages and sets shared paths.
+
+random_seed: 42
+data_root: data
+output_root: outputs
+
+stages:
+  - name: baseline
+    script: experiments/baseline/run_baseline.py
+    config: experiments/baseline/config.yaml
+    description: Generate ground-truth telemetry (AdaptiveAgent pool) and save it.
+
+  - name: manifold
+    script: experiments/manifold/run_projection_experiment.py
+    config: experiments/manifold/config.yaml
+    depends_on: [baseline]
+    description: Fit PCA/UMAP/t-SNE on the baseline telemetry and score embedding quality.
+
+  - name: drift
+    script: experiments/drift/run_drift_experiment.py
+    config: experiments/drift/config.yaml
+    depends_on: [baseline]
+    description: Fit the healthy envelope and score EWMA/KL/Mahalanobis drift detectors.
+
+  - name: rl_adaptive
+    script: experiments/rl_adaptive/run_rl_experiment.py
+    config: experiments/rl_adaptive/config.yaml
+    depends_on: [baseline, drift]
+    description: Train the Q-learning pool inside BehavioralEnv and evaluate against the evidence checklist.
+
+# No orchestrator currently reads `stages` to run them in sequence — each
+# script in experiments/ is still invoked standalone (`python experiments/<name>/run_*.py`).
+# This file documents the intended dependency order; wiring an actual runner
+# is tracked as NB07 follow-up work (see docs/references/CODEBASE_UNDERSTANDING.md).
