@@ -36,23 +36,37 @@ LBSM studies:
 
 #### 📓 Notebooks
 
-- Notebook-01 : 
+- Notebook-01 — Telemetry Generation :
 <p>
   <a href="notebooks/01_telemetry_generation.ipynb">
     <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
   </a>
 </p>
 
-- Notebook-02 :
+- Notebook-02 — Manifold Learning :
 <p>
   <a href="notebooks/02_manifold_learning.ipynb">
     <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
   </a>
 </p>
 
-- Notebook-03 :
+- Notebook-03 — HMM Inference :
 <p>
   <a href="notebooks/03_hmm_inference.ipynb">
+    <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
+  </a>
+</p>
+
+- Notebook-04 — Anomaly Detection :
+<p>
+  <a href="notebooks/04_anomaly_detection.ipynb">
+    <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
+  </a>
+</p>
+
+- Notebook-05 — RL Behavioral Evolution :
+<p>
+  <a href="notebooks/05_rl_behavioral_evolution.ipynb">
     <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
   </a>
 </p>
@@ -66,12 +80,12 @@ LBSM studies:
   </a>
 </p>
 
-- trajectory & transistion coords dataset (nb02) :
+- trajectory & transition coords dataset (nb02) :
 <p>
   <a href="data/processed/nb02/trajectory_stats.csv">
     <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
   </a>
-  <a href="data/processed/nb02/transistion_coords.csv">
+  <a href="data/processed/nb02/transition_coords.csv">
     <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
   </a>
 </p>
@@ -84,6 +98,63 @@ LBSM studies:
 <a href="data/processed/nb03/hmm_regime_accuracy.csv">
   <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
 </a>
+</p>
+
+- anomaly detection: threshold sweep and detection latency (nb04) :
+<p>
+<a href="data/processed/nb04/threshold_sweep.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+<a href="data/processed/nb04/detection_latency.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+</p>
+
+- RL training log and learned policy summary (nb05) :
+<p>
+<a href="data/processed/nb05/rl_training_log.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+<a href="data/processed/nb05/policy_summary.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+</p>
+
+#### 📄 Reports
+
+- Notebook-01 Report — Telemetry Generation & Latent Behavioral Structure Analysis :
+<p>
+  <a href="outputs/reports/nb01/lbsm_notebook01.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
+</p>
+
+- Notebook-02 Report — Manifold Learning & Latent Geometric Structures :
+<p>
+  <a href="outputs/reports/nb02/lbsm_notebook02.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
+</p>
+
+- Notebook-03 Report — HMM Inference & Unsupervised Regime Recovery :
+<p>
+  <a href="outputs/reports/nb03/lbsm_notebook03.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
+</p>
+
+- Notebook-04 Report — Online Anomaly Detection & Regime Shift Analysis :
+<p>
+  <a href="outputs/reports/nb04/lbsm_notebook04.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
+</p>
+
+- Notebook-05 Report — Reinforcement Learning & Behavioral Regime Reallocation :
+<p>
+  <a href="outputs/reports/nb05/lbsm_notebook05.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
 </p>
 
 ---
