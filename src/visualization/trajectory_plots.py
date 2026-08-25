@@ -7,7 +7,7 @@ scatter and per-agent line trajectories, coloured by behavioural regime).
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -143,4 +143,109 @@ def plot_regime_trajectories(
     ax.set_ylabel(y_col)
     ax.set_title(title)
     ax.legend(fontsize=8, title="Dominant regime")
+    return ax
+
+
+def plot_trajectory_overlay_3d(
+    background_embedding: np.ndarray,
+    background_labels: np.ndarray,
+    overlay_embedding: np.ndarray,
+    overlay_values: np.ndarray,
+    overlay_kind: str = "categorical",
+    overlay_palette: Optional[Dict] = None,
+    overlay_cmap: str = "viridis",
+    ax: Optional[Axes] = None,
+    profile_names: Sequence[str] = PROFILE_NAMES,
+    title: str = "Trajectory Overlay on Manifold",
+    background_s: float = 2.0,
+    background_alpha: float = 0.10,
+    overlay_s: float = 10.0,
+    overlay_alpha: float = 0.85,
+    overlay_legend_title: str = "",
+    colorbar_label: str = "",
+    elev: float = 22.0,
+    azim: float = -60.0,
+) -> Axes:
+    """3D scatter of a foreground trajectory over a faint background manifold.
+
+    Designed for overlaying an RL trajectory (or any new sequence of points)
+    on top of the full NB02 UMAP embedding, so the reader can see where the
+    trajectory sits relative to the regimes characterised there. The
+    background is deliberately small/low-alpha so the overlay — the actual
+    subject of the figure — reads clearly on top of it.
+
+    Parameters
+    ----------
+    background_embedding : (N, 3) array — e.g. the full NB02 UMAP embedding
+    background_labels    : (N,) ground-truth regime names or indices
+    overlay_embedding    : (M, 3) array — e.g. an RL trajectory projected
+        into the same embedding space via the fitted reducer's ``.transform``
+    overlay_values : (M,) array coloring the overlay points. Interpretation
+        depends on ``overlay_kind``:
+          - "categorical": values are looked up in ``overlay_palette``
+            (dict value -> color); legend entry per unique value.
+          - "continuous": values are mapped through ``overlay_cmap`` with a
+            colorbar (e.g. episode index / training phase progression).
+    overlay_kind : "categorical" or "continuous"
+    overlay_palette : required when overlay_kind == "categorical"
+    elev, azim : matplotlib 3D view angle (``Axes3D.view_init``)
+
+    Returns
+    -------
+    ax : the 3D Axes
+    """
+    if ax is None:
+        fig = plt.figure(figsize=(8, 7))
+        ax = fig.add_subplot(111, projection="3d")
+
+    # ── Background: faint, regime-colored context
+    bg_labels = np.asarray(background_labels)
+    for name in profile_names:
+        mask = (
+            bg_labels == name
+            if bg_labels.dtype.kind in "OU"
+            else bg_labels == profile_names.index(name)
+        )
+        if mask.any():
+            ax.scatter(
+                background_embedding[mask, 0],
+                background_embedding[mask, 1],
+                background_embedding[mask, 2],
+                s=background_s, alpha=background_alpha,
+                color=PALETTE.get(name, "#999999"),
+                linewidths=0, label=None,
+            )
+
+    # ── Overlay: the actual subject of the figure
+    if overlay_kind == "categorical":
+        if overlay_palette is None:
+            raise ValueError("overlay_palette is required when overlay_kind='categorical'")
+        values = np.asarray(overlay_values)
+        for val in sorted(set(values.tolist())):
+            mask = values == val
+            if not mask.any():
+                continue
+            ax.scatter(
+                overlay_embedding[mask, 0],
+                overlay_embedding[mask, 1],
+                overlay_embedding[mask, 2],
+                s=overlay_s, alpha=overlay_alpha,
+                color=overlay_palette.get(val, "#333333"),
+                linewidths=0, label=str(val),
+            )
+        ax.legend(fontsize=8, title=overlay_legend_title, markerscale=2, loc="upper left")
+    elif overlay_kind == "continuous":
+        sc = ax.scatter(
+            overlay_embedding[:, 0], overlay_embedding[:, 1], overlay_embedding[:, 2],
+            s=overlay_s, alpha=overlay_alpha,
+            c=overlay_values, cmap=overlay_cmap, linewidths=0,
+        )
+        cb = plt.colorbar(sc, ax=ax, shrink=0.6, pad=0.08)
+        cb.set_label(colorbar_label or "value")
+    else:
+        raise ValueError("overlay_kind must be 'categorical' or 'continuous'")
+
+    ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2"); ax.set_zlabel("UMAP 3")
+    ax.set_title(title)
+    ax.view_init(elev=elev, azim=azim)
     return ax

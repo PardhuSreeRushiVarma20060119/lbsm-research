@@ -252,7 +252,11 @@ class BehavioralEnv:
         rec = self._emit_record(timestep=0)
         obs = obs_to_grid(rec["latency"], rec["entropy"])
         if self.record_traj:
-            self._trajectory.append({**rec, "action": -1, "reward": 0.0,
+            # NOTE: key is "rl_reward", not "reward" — `rec` already has a
+            # "reward" key (the telemetry feature from TELEMETRY_FEATURES).
+            # Using "reward" here would silently overwrite it with the RL
+            # step reward on dict-literal merge; see step() for the same note.
+            self._trajectory.append({**rec, "action": -1, "rl_reward": 0.0,
                                       "obs": obs, "episode_step": 0})
         self._t = 1
         return obs
@@ -318,10 +322,19 @@ class BehavioralEnv:
         }
 
         if self.record_traj:
+            # NOTE: key is "rl_reward", not "reward" — see reset() for why:
+            # `rec` carries the telemetry "reward" feature (a.u. instantaneous
+            # reward signal, per behavior_profiles.py) and must not be
+            # clobbered by the RL step's shaped reward. `StepResult.info`
+            # is unaffected by this (it reads `rec["reward"]` directly), so
+            # Q-learning itself (which only ever reads `result.info`/
+            # `result.reward`) was never affected by this — only consumers
+            # of `.trajectory` (e.g. feature-space distance/UMAP work) were
+            # at risk of silently getting the RL reward instead of telemetry.
             self._trajectory.append({
                 **rec,
                 "action"      : action,
-                "reward"      : reward,
+                "rl_reward"   : reward,
                 "obs"         : obs,
                 "episode_step": self._t,
             })

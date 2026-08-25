@@ -130,6 +130,13 @@ class QLearningAgent:
         self.episode_log: List[EpisodeStats] = []
         self._epsilon = config.epsilon_start
 
+        # Optional full per-step trajectory capture (one list per episode).
+        # Off by default: env.trajectory only ever holds the *last* episode
+        # (reset() clears it), so anything wanting per-step history across
+        # the whole training run must opt in via train(collect_trajectories=True)
+        # and have it snapshotted here before the next reset() wipes it.
+        self.trajectory_log: List[List[Dict]] = []
+
         # Optional: Mahalanobis envelope for scoring mid-training
         self._envelope = None
 
@@ -141,6 +148,7 @@ class QLearningAgent:
         self,
         healthy_envelope=None,
         verbose: bool = False,
+        collect_trajectories: bool = False,
     ) -> List[EpisodeStats]:
         """Run Q-learning for cfg.n_episodes episodes.
 
@@ -150,6 +158,13 @@ class QLearningAgent:
             If supplied, each episode records mean Mahalanobis score so NB05
             can track anomaly score evolution alongside reward.
         verbose : print episode stats every 10 episodes
+        collect_trajectories : if True, snapshot ``self.env.trajectory`` after
+            every episode into ``self.trajectory_log`` (one list of per-step
+            dicts per episode). Off by default — full per-step history across
+            120 episodes x 500 steps is ~1000x larger than the episode-level
+            stats most callers need. Needed for e.g. NB06's manifold overlay,
+            which requires the true visited feature-space points across the
+            whole run, not just the last episode.
 
         Returns
         -------
@@ -157,10 +172,17 @@ class QLearningAgent:
         """
         self._envelope = healthy_envelope
         self.episode_log = []
+        self.trajectory_log = []
 
         for ep in range(self.cfg.n_episodes):
             stats = self._run_episode(ep)
             self.episode_log.append(stats)
+            if collect_trajectories:
+                # list(...) snapshots the current episode's records before
+                # the next reset() reassigns self.env._trajectory to a new,
+                # empty list — the dicts themselves are never mutated after
+                # being appended, so a shallow copy of the list is sufficient.
+                self.trajectory_log.append(list(self.env.trajectory))
             self._epsilon = max(
                 self.cfg.epsilon_end,
                 self._epsilon * self.cfg.epsilon_decay,
