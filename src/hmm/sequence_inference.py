@@ -39,6 +39,7 @@ def model_selection_sweep(
     n_iter         : int           = 200,
     tol            : float         = 1e-4,
     random_state   : int           = 42,
+    min_covar      : float         = 1e-3,
 ) -> pd.DataFrame:
     """Fit HMMs with varying n_components and return BIC / AIC scores.
 
@@ -62,6 +63,11 @@ def model_selection_sweep(
     n_iter          : maximum EM iterations per model
     tol             : convergence tolerance
     random_state    : reproducibility seed
+    min_covar       : Tikhonov/diagonal-loading floor before covariance
+        inversion (see ``LBSM-ISSUE-NB07-001``, ``outputs/reports/issues/``,
+        and :func:`src.hmm.robust_fitting.fit_hmm_robust` for the full
+        mitigation stack this single-fit sweep does not by itself provide
+        multi-restart/fallback protection against)
 
     Returns
     -------
@@ -81,6 +87,7 @@ def model_selection_sweep(
             covariance_type = covariance_type,
             n_iter          = n_iter,
             tol             = tol,
+            min_covar       = min_covar,
             random_state    = random_state,
         )
         model.fit(X_concat, lengths)

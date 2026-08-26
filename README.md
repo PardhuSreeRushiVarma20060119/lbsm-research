@@ -72,7 +72,21 @@ LBSM studies:
   </a>
 </p>
 
-#### 🗂️ Datasets
+- Notebook-06 — Manifold Visualisation :
+<p>
+  <a href="notebooks/06_manifold_visualization.ipynb">
+    <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
+  </a>
+</p>
+
+- Notebook-07 — Robustness & Final Experiment Analysis :
+<p>
+  <a href="notebooks/07_final_experiment_analysis.ipynb">
+    <img src="https://img.shields.io/badge/Open-Notebook-blue?style=for-the-badge&logo=jupyter">
+  </a>
+</p>
+
+#### 🗂️ Exported Data
 
 - t2000 dataset (nb01) :
 <p>
@@ -121,6 +135,29 @@ LBSM studies:
 </a>
 </p>
 
+- RL trajectory embedding and KDE phase statistics (nb06) :
+<p>
+<a href="data/processed/nb06/rl_trajectory_embedded.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+<a href="data/processed/nb06/kde_phase_statistics.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+</p>
+
+- Full-scale robustness grid results and per-attempt audit trail (nb07) :
+<p>
+<a href="data/processed/nb07/robustness_grid_results.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+<a href="data/processed/nb07/full_scale_attempt_log.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+<a href="data/processed/nb07/hmm_state_identity_diagnostic.csv">
+  <img src="https://img.shields.io/badge/Open-Dataset-green?style=for-the-badge&logo=databricks">
+</a>
+</p>
+
 #### 📄 Reports
 
 - Notebook-01 Report — Telemetry Generation & Latent Behavioral Structure Analysis :
@@ -154,6 +191,20 @@ LBSM studies:
 - Notebook-05 Report — Reinforcement Learning & Behavioral Regime Reallocation :
 <p>
   <a href="outputs/reports/nb05/lbsm_notebook05.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
+</p>
+
+- Notebook-06 Report — Manifold Visualisation: 2-D/3-D UMAP Overlay & KDE Density Analysis :
+<p>
+  <a href="outputs/reports/nb06/lbsm_notebook06.pdf">
+    <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
+  </a>
+</p>
+
+- Notebook-07 Report — Robustness & Final Experiment Analysis (Full-Scale, 160-Config Grid) :
+<p>
+  <a href="outputs/reports/nb07/lbsm_notebook07.pdf">
     <img src="https://img.shields.io/badge/Open-Report-red?style=for-the-badge&logo=adobeacrobatreader">
   </a>
 </p>

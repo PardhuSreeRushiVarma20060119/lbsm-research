@@ -164,6 +164,76 @@ def hyperparameter_sweep(
 
 
 # ---------------------------------------------------------------------------
+# Generic 2-D KDE density grid
+# ---------------------------------------------------------------------------
+def kde_density_grid(
+    points: np.ndarray,
+    grid_resolution: int = 100,
+    bw_method: Optional[float] = 0.15,
+    padding: float = 0.5,
+    grid_bounds: Optional[Tuple[float, float, float, float]] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Estimate a 2-D Gaussian KDE density surface for an arbitrary point set.
+
+    Unlike :func:`per_regime_density` (which is specifically keyed by ground-truth
+    regime label), this takes any ``(N, 2)`` point set directly — e.g. one training
+    phase's worth of RL trajectory points — so it composes with any grouping.
+
+    Parameters
+    ----------
+    points          : np.ndarray  shape (N, 2)
+    grid_resolution : evaluation grid density (per axis)
+    bw_method       : passed to :class:`scipy.stats.gaussian_kde` (``None`` uses
+                      scipy's default Scott's-rule bandwidth)
+    padding         : margin added around the point set's own bounding box,
+                      ignored if ``grid_bounds`` is supplied
+    grid_bounds     : optional ``(x_min, x_max, y_min, y_max)`` — pass the *same*
+                      bounds across multiple calls (e.g. one per training phase)
+                      so the resulting ``zz`` grids are directly comparable
+                      cell-for-cell (required for :func:`kde_overlap_coefficient`,
+                      and for overlaying multiple phases' contours on one axes).
+
+    Returns
+    -------
+    xx, yy, zz : np.ndarray, each shape (grid_resolution, grid_resolution)
+    """
+    from scipy.stats import gaussian_kde
+
+    if grid_bounds is not None:
+        x_min, x_max, y_min, y_max = grid_bounds
+    else:
+        x_min, x_max = points[:, 0].min() - padding, points[:, 0].max() + padding
+        y_min, y_max = points[:, 1].min() - padding, points[:, 1].max() + padding
+
+    xx, yy = np.meshgrid(
+        np.linspace(x_min, x_max, grid_resolution),
+        np.linspace(y_min, y_max, grid_resolution),
+    )
+    grid_pts = np.vstack([xx.ravel(), yy.ravel()])
+
+    kde = gaussian_kde(points.T, bw_method=bw_method)
+    zz  = kde(grid_pts).reshape(xx.shape)
+    return xx, yy, zz
+
+
+def kde_overlap_coefficient(zz_a: np.ndarray, zz_b: np.ndarray) -> float:
+    """Overlap coefficient between two KDE density surfaces on the *same* grid.
+
+    Defined as :math:`\\int \\min(f_a, f_b) \\,/\\, \\max\\!\\big(\\int f_a, \\int f_b\\big)`,
+    approximated by summing over grid cells (valid only if ``zz_a``/``zz_b`` were
+    evaluated on the same ``xx``/``yy`` grid, e.g. via matching ``grid_bounds`` in
+    :func:`kde_density_grid`). 1.0 = identical distributions, 0.0 = disjoint support.
+
+    Returns
+    -------
+    overlap : float in [0, 1]
+    """
+    inter = np.minimum(zz_a, zz_b).sum()
+    denom = max(zz_a.sum(), zz_b.sum())
+    return float(inter / denom) if denom > 0 else 0.0
+
+
+# ---------------------------------------------------------------------------
 # Per-regime embedding density
 # ---------------------------------------------------------------------------
 def per_regime_density(
@@ -186,23 +256,18 @@ def per_regime_density(
     densities : dict  regime_name → (xx, yy, zz)
         where xx, yy are meshgrid arrays and zz is the KDE density.
     """
-    from scipy.stats import gaussian_kde
-
     x_min, x_max = embedding[:, 0].min() - 0.5, embedding[:, 0].max() + 0.5
     y_min, y_max = embedding[:, 1].min() - 0.5, embedding[:, 1].max() + 0.5
-    xx, yy = np.meshgrid(
-        np.linspace(x_min, x_max, grid_resolution),
-        np.linspace(y_min, y_max, grid_resolution),
-    )
-    grid_pts = np.vstack([xx.ravel(), yy.ravel()])
+    bounds = (x_min, x_max, y_min, y_max)
 
     densities: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     for idx, name in enumerate(profile_names):
-        pts = embedding[labels == idx].T
-        if pts.shape[1] < 4:
+        pts = embedding[labels == idx]
+        if pts.shape[0] < 4:
             continue
-        kde = gaussian_kde(pts, bw_method=0.15)
-        zz  = kde(grid_pts).reshape(xx.shape)
+        xx, yy, zz = kde_density_grid(
+            pts, grid_resolution=grid_resolution, bw_method=0.15, grid_bounds=bounds,
+        )
         densities[name] = (xx, yy, zz)
 
     return densities

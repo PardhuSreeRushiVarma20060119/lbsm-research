@@ -113,6 +113,65 @@ def prepare_sequences(
 
 
 # ---------------------------------------------------------------------------
+# Ground-truth alignment and scoring (shared by fit_hmm and any caller
+# scoring a model fit elsewhere, e.g. src.hmm.robust_fitting.fit_hmm_robust)
+# ---------------------------------------------------------------------------
+def align_and_score(
+    model,
+    X_concat     : np.ndarray,
+    lengths      : List[int],
+    y_gt         : np.ndarray,
+    profile_names: Tuple[str, ...] = ("stable", "exploratory", "adaptive", "unstable"),
+) -> Dict:
+    """Viterbi-decode a *fitted* HMM, Hungarian-align its states to ground
+    truth, and compute the standard LBSM scalar metrics.
+
+    Factored out of :func:`fit_hmm` so any already-fitted model — in
+    particular the output of :func:`src.hmm.robust_fitting.fit_hmm_robust`,
+    which fits first and lets the caller decide how/whether to score it
+    against ``y_gt`` — can be scored the same way without duplicating the
+    Hungarian-alignment logic.
+
+    Parameters
+    ----------
+    model         : a fitted hmmlearn ``GaussianHMM`` (or compatible)
+    X_concat      : concatenated observation matrix used to fit ``model``
+    lengths       : per-sequence lengths matching ``X_concat``
+    y_gt          : ground-truth integer labels (N_total,)
+    profile_names : ordered regime name tuple (for confusion matrix axes)
+
+    Returns
+    -------
+    dict with keys: ``pred_raw``, ``pred_aligned``, ``posteriors_all``,
+    ``mapping``, ``ari``, ``accuracy``, ``log_likelihood``, ``confusion``.
+    """
+    pred_raw       = model.predict(X_concat, lengths)
+    posteriors_all = model.predict_proba(X_concat)
+
+    n_gt     = len(profile_names)
+    C        = confusion_matrix(y_gt, pred_raw, labels=list(range(n_gt)))
+    row, col = linear_sum_assignment(-C)
+    mapping  = {int(c): int(r) for c, r in zip(col, row)}
+    pred_aligned = np.array([mapping.get(s, s) for s in pred_raw])
+
+    ari      = float(adjusted_rand_score(y_gt, pred_raw))
+    acc      = float(accuracy_score(y_gt, pred_aligned))
+    ll_obs   = float(model.score(X_concat, lengths)) / len(X_concat)
+    conf_mat = confusion_matrix(y_gt, pred_aligned, labels=list(range(n_gt)))
+
+    return {
+        "pred_raw"      : pred_raw,
+        "pred_aligned"  : pred_aligned,
+        "posteriors_all": posteriors_all,
+        "mapping"       : mapping,
+        "ari"           : ari,
+        "accuracy"      : acc,
+        "log_likelihood": ll_obs,
+        "confusion"     : conf_mat,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Core fit
 # ---------------------------------------------------------------------------
 def fit_hmm(
@@ -124,6 +183,7 @@ def fit_hmm(
     n_iter        : int = 200,
     tol           : float = 1e-4,
     random_state  : int = 42,
+    min_covar     : float = 1e-3,
     profile_names : Tuple[str, ...] = ("stable", "exploratory", "adaptive", "unstable"),
 ) -> HMMResult:
     """Fit a Gaussian-emission HMM via Baum-Welch (EM) and decode via Viterbi.
@@ -141,6 +201,13 @@ def fit_hmm(
     n_iter          : maximum Baum-Welch EM iterations
     tol             : convergence tolerance on log-likelihood change
     random_state    : reproducibility seed
+    min_covar       : Tikhonov/diagonal-loading floor added to estimated
+        covariance before inversion (hmmlearn's own default is ``1e-3``).
+        Harmless for ``covariance_type='diag'``; load-bearing for
+        ``'full'``/``'tied'`` on small samples — see
+        ``LBSM-ISSUE-NB07-001`` (``outputs/reports/issues/``) and
+        :func:`src.hmm.robust_fitting.fit_hmm_robust` for the full
+        mitigation stack this exists to support.
     profile_names   : ordered regime name tuple (for confusion matrix axes)
 
     Returns
@@ -155,28 +222,12 @@ def fit_hmm(
         covariance_type = covariance_type,
         n_iter          = n_iter,
         tol             = tol,
+        min_covar       = min_covar,
         random_state    = random_state,
     )
     model.fit(X_concat, lengths)
 
-    # ── Viterbi decoding (most probable state path)
-    pred_raw = model.predict(X_concat, lengths)
-
-    # ── Forward-backward posteriors P(s_t | x_{1:T})
-    posteriors_all = model.predict_proba(X_concat)
-
-    # ── Hungarian alignment: match HMM states to GT regime indices
-    n_gt     = len(profile_names)
-    C        = confusion_matrix(y_gt, pred_raw, labels=list(range(n_gt)))
-    row, col = linear_sum_assignment(-C)
-    mapping  = {int(c): int(r) for c, r in zip(col, row)}
-    pred_aligned = np.array([mapping.get(s, s) for s in pred_raw])
-
-    # ── Scalar metrics
-    ari      = float(adjusted_rand_score(y_gt, pred_raw))
-    acc      = float(accuracy_score(y_gt, pred_aligned))
-    ll_obs   = float(model.score(X_concat, lengths)) / len(X_concat)
-    conf_mat = confusion_matrix(y_gt, pred_aligned, labels=list(range(n_gt)))
+    scored = align_and_score(model, X_concat, lengths, y_gt, profile_names)
 
     # ── EM convergence history
     conv_ll  = list(model.monitor_.history)
@@ -184,14 +235,14 @@ def fit_hmm(
 
     return HMMResult(
         model          = model,
-        pred_raw       = pred_raw,
-        pred_aligned   = pred_aligned,
-        posteriors_all = posteriors_all,
-        mapping        = mapping,
-        ari            = ari,
-        accuracy       = acc,
-        log_likelihood = ll_obs,
-        confusion      = conf_mat,
+        pred_raw       = scored["pred_raw"],
+        pred_aligned   = scored["pred_aligned"],
+        posteriors_all = scored["posteriors_all"],
+        mapping        = scored["mapping"],
+        ari            = scored["ari"],
+        accuracy       = scored["accuracy"],
+        log_likelihood = scored["log_likelihood"],
+        confusion      = scored["confusion"],
         convergence_ll = conv_ll,
         n_iter_actual  = n_actual,
     )

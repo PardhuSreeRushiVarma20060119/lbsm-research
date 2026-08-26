@@ -1,0 +1,5 @@
+embedding_dim,covariance_type,bic_opt_k
+2,diag,8
+2,full,8
+3,diag,8
+3,full,8

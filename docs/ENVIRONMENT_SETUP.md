@@ -49,13 +49,21 @@ dependency submission validates this list against PyPI, and SageMath is provided
 Nix/system"* — i.e. `requirements.txt` is also consumed by a GitHub dependency-submission check
 that expects every line to resolve on PyPI, and SageMath isn't a PyPI package.
 
-**Known gotcha (fixed as of this writing, kept here for context)**: `requirements.txt` as
-committed at `d7b35f0` had a SageMath REPL banner (box-drawing characters plus a stray `sage:`
-prompt line) corrupting the comment after `hmmlearn` — evidence the shellHook's heredoc got
-interleaved with literal Sage banner output at some point before that commit. This has since
-been cleaned up locally. If it recurs: the shellHook always starts with
-`echo ... > requirements.txt` (a full overwrite), so simply re-entering `nix develop`
-regenerates the file cleanly — no manual cleanup needed.
+**Known gotcha — root cause found and fixed**: `requirements.txt` as committed at `d7b35f0` had
+a SageMath REPL banner (box-drawing characters plus a stray `sage:` prompt line) corrupting the
+comment after `hmmlearn`, and on some machines `nix develop` would hang indefinitely right at
+that point instead of dropping into a shell. Both were the same bug: the shellHook wrote
+`requirements.txt` via an **unquoted heredoc** (`cat >> requirements.txt <<EOF`), and unquoted
+heredocs undergo full shell expansion — including command substitution. The comment text
+`` `sage` `` (meant as literal Markdown-style code formatting: *"do not add `sage` here"*) was
+therefore interpreted as backtick command substitution and **actually executed the `sage`
+binary** (a real command on `PATH` in this shell) with no arguments, launching an interactive
+SageMath REPL mid-shellHook. That REPL then tried to read/write the terminal from a
+non-foreground process, got `SIGTTIN`/`SIGTTOU`, and froze — which is both why the file got
+Sage's banner text injected into it, and why `nix develop` would hang on some terminals and not
+others (only ones where the freeze happened to matter for job control). Fixed by quoting the
+heredoc delimiter (`<<'EOF'`) so the body is treated as inert literal text — see the comment
+directly above the heredoc in `flake.nix` for the full explanation in context.
 
 ```bash
 nix develop              # canonical dev shell

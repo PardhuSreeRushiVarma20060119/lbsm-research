@@ -146,6 +146,73 @@ def plot_regime_trajectories(
     return ax
 
 
+def plot_trajectory_overlay_2d(
+    background_embedding: np.ndarray,
+    background_labels: np.ndarray,
+    overlay_embedding: np.ndarray,
+    overlay_values: np.ndarray,
+    overlay_kind: str = "categorical",
+    overlay_palette: Optional[Dict] = None,
+    overlay_cmap: str = "viridis",
+    ax: Optional[Axes] = None,
+    profile_names: Sequence[str] = PROFILE_NAMES,
+    title: str = "Trajectory Overlay on Manifold (2D)",
+    background_s: float = 3.0,
+    background_alpha: float = 0.12,
+    overlay_s: float = 8.0,
+    overlay_alpha: float = 0.6,
+    overlay_legend_title: str = "",
+    colorbar_label: str = "",
+) -> Axes:
+    """2-D twin of :func:`plot_trajectory_overlay_3d` — same semantics, one
+    fewer dimension. See that function's docstring for parameter meaning.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(7.5, 6.5))
+
+    bg_labels = np.asarray(background_labels)
+    for name in profile_names:
+        mask = (
+            bg_labels == name
+            if bg_labels.dtype.kind in "OU"
+            else bg_labels == profile_names.index(name)
+        )
+        if mask.any():
+            ax.scatter(
+                background_embedding[mask, 0], background_embedding[mask, 1],
+                s=background_s, alpha=background_alpha,
+                color=PALETTE.get(name, "#999999"), linewidths=0,
+            )
+
+    if overlay_kind == "categorical":
+        if overlay_palette is None:
+            raise ValueError("overlay_palette is required when overlay_kind='categorical'")
+        values = np.asarray(overlay_values)
+        for val in sorted(set(values.tolist())):
+            mask = values == val
+            if not mask.any():
+                continue
+            ax.scatter(
+                overlay_embedding[mask, 0], overlay_embedding[mask, 1],
+                s=overlay_s, alpha=overlay_alpha,
+                color=overlay_palette.get(val, "#333333"), linewidths=0, label=str(val),
+            )
+        ax.legend(fontsize=8, title=overlay_legend_title, markerscale=2, loc="best")
+    elif overlay_kind == "continuous":
+        sc = ax.scatter(
+            overlay_embedding[:, 0], overlay_embedding[:, 1],
+            s=overlay_s, alpha=overlay_alpha, c=overlay_values, cmap=overlay_cmap, linewidths=0,
+        )
+        cb = plt.colorbar(sc, ax=ax)
+        cb.set_label(colorbar_label or "value")
+    else:
+        raise ValueError("overlay_kind must be 'categorical' or 'continuous'")
+
+    ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2")
+    ax.set_title(title)
+    return ax
+
+
 def plot_trajectory_overlay_3d(
     background_embedding: np.ndarray,
     background_labels: np.ndarray,
@@ -245,6 +312,90 @@ def plot_trajectory_overlay_3d(
     else:
         raise ValueError("overlay_kind must be 'categorical' or 'continuous'")
 
+    ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2"); ax.set_zlabel("UMAP 3")
+    ax.set_title(title)
+    ax.view_init(elev=elev, azim=azim)
+    return ax
+
+
+def plot_trajectory_density_3d(
+    background_embedding: np.ndarray,
+    background_labels: np.ndarray,
+    phase_points: Dict[str, np.ndarray],
+    phase_palette: Dict[str, str],
+    ax: Optional[Axes] = None,
+    profile_names: Sequence[str] = PROFILE_NAMES,
+    title: str = "Trajectory Density over Manifold (floor-projected KDE)",
+    grid_resolution: int = 80,
+    background_s: float = 1.5,
+    background_alpha: float = 0.08,
+    overlay_s: float = 4.0,
+    overlay_alpha: float = 0.35,
+    contour_alpha: float = 0.55,
+    n_contour_levels: int = 6,
+    elev: float = 22.0,
+    azim: float = -60.0,
+) -> Axes:
+    """3-D scatter with each phase's 2-D (UMAP1, UMAP2) KDE density contour
+    projected onto the plot's floor (``zdir='z'`` at the minimum Z).
+
+    True 3-D isosurface rendering (marching cubes) is possible but heavy and
+    hard to read in a static figure; projecting the XY-marginal density onto
+    the floor is the standard, robust way to add density information to a 3-D
+    scatter without that complexity — the scatter still carries the full 3-D
+    structure, the floor contours summarise where each phase concentrates.
+
+    Parameters
+    ----------
+    phase_points  : dict phase_name -> (N_phase, 3) array (UMAP1, UMAP2, UMAP3)
+    phase_palette : dict phase_name -> color (same keys as ``phase_points``)
+    """
+    from scipy.stats import gaussian_kde
+
+    if ax is None:
+        fig = plt.figure(figsize=(9, 7))
+        ax = fig.add_subplot(111, projection="3d")
+
+    # Background context (faint, regime-colored)
+    bg_labels = np.asarray(background_labels)
+    for name in profile_names:
+        mask = (
+            bg_labels == name
+            if bg_labels.dtype.kind in "OU"
+            else bg_labels == profile_names.index(name)
+        )
+        if mask.any():
+            ax.scatter(
+                background_embedding[mask, 0], background_embedding[mask, 1],
+                background_embedding[mask, 2],
+                s=background_s, alpha=background_alpha,
+                color=PALETTE.get(name, "#999999"), linewidths=0,
+            )
+
+    all_pts = np.concatenate(list(phase_points.values()), axis=0)
+    z_floor = all_pts[:, 2].min()
+    x_min, x_max = all_pts[:, 0].min() - 0.5, all_pts[:, 0].max() + 0.5
+    y_min, y_max = all_pts[:, 1].min() - 0.5, all_pts[:, 1].max() + 0.5
+    xx, yy = np.meshgrid(
+        np.linspace(x_min, x_max, grid_resolution),
+        np.linspace(y_min, y_max, grid_resolution),
+    )
+    grid_pts = np.vstack([xx.ravel(), yy.ravel()])
+
+    for phase, pts in phase_points.items():
+        color = phase_palette.get(phase, "#333333")
+        ax.scatter(
+            pts[:, 0], pts[:, 1], pts[:, 2],
+            s=overlay_s, alpha=overlay_alpha, color=color, linewidths=0, label=phase,
+        )
+        kde = gaussian_kde(pts[:, :2].T, bw_method=0.15)
+        zz = kde(grid_pts).reshape(xx.shape)
+        ax.contour(
+            xx, yy, zz, zdir="z", offset=z_floor,
+            levels=n_contour_levels, colors=[color], alpha=contour_alpha, linewidths=1.2,
+        )
+
+    ax.legend(fontsize=8, title="phase", markerscale=3, loc="upper left")
     ax.set_xlabel("UMAP 1"); ax.set_ylabel("UMAP 2"); ax.set_zlabel("UMAP 3")
     ax.set_title(title)
     ax.view_init(elev=elev, azim=azim)
