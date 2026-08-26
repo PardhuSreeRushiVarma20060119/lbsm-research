@@ -14,7 +14,3 @@ was ever committed); `nb05`–`nb07` have both.
   `LBSM-ISSUE-NB07-001`, on full-covariance HMM numerical instability, resolved in
   `src/hmm/robust_fitting.py` before NB07 ran). `lbsm_covariance_issue.pdf` is git-ignored by
   name — kept locally, not checked in.
-
-LaTeX build artefacts (`.aux`/`.log`/`.out`/`.toc`/`.fls`/`.fdb_latexmk`) are left alongside the
-`.tex`/`.pdf` sources rather than cleaned after each compile; `latexmk -c` removes them without
-touching the PDF.
