@@ -27,7 +27,7 @@ unreliable result using the returned :class:`RobustHMMResult`.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 6.2 — Model Order Selection and Identifiability
 LBSM-ISSUE-NB07-001 — Full Covariance HMM Numerical Instability
 """

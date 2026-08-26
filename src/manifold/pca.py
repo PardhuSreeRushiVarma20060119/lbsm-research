@@ -22,7 +22,7 @@ not to compete with UMAP/t-SNE but to:
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 5.1 — Linear Baseline: Principal Component Analysis
 """
 

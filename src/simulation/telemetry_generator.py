@@ -16,7 +16,7 @@ Typical usage
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 4 — Experimental Setup & Dataset Construction
 """
 

@@ -28,7 +28,7 @@ Training produces per-episode statistics:
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 8.1 — Tabular Q-Learning Over Behavioral State Space
 """
 

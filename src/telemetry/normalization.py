@@ -11,7 +11,7 @@ before any distance-based computation (Mahalanobis, EWMA, KL divergence).
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 4.2 — Feature Standardisation
 """
 

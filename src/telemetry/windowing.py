@@ -10,7 +10,7 @@ observations into window-level feature summaries for distributional comparison.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 7.1 — Online Drift Detection: Window Construction
 """
 

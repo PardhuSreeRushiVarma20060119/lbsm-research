@@ -277,7 +277,7 @@ lbsm-research/
 ## 🎓 References & Background
 
 ### Research Paper (in progress)
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 - Section outline: `paper/paper-skeleton.md` — maps directly onto the `src/` module structure (§3 simulation, §5 manifold, §6 HMM, §7 drift, §8 RL)
 - Draft LaTeX source: `paper/latex-tmlr/`
 - Math appendix (SageMath): `paper/math-supplementry/`

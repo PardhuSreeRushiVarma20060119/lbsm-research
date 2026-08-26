@@ -21,7 +21,7 @@ computationally efficient for online use.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 7.3 — Distributional Drift: KL Divergence
 """
 

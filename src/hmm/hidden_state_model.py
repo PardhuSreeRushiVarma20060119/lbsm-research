@@ -12,7 +12,7 @@ of the ``HMMResult`` this function returns.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 6.1 — Unsupervised Regime Recovery via Hidden Markov Models
 """
 

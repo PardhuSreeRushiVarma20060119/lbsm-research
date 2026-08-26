@@ -13,7 +13,7 @@ After online detectors flag anomalies, this module answers:
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 7.5 — Regime Shift Characterisation
 """
 

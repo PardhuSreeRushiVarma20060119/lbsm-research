@@ -21,7 +21,7 @@ This module quantifies:
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 5.5 — Temporal Behavioral Geometry
 """
 

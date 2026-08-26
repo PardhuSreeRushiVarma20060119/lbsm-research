@@ -12,7 +12,7 @@ All functions accept plain numpy arrays; they are decoupled from
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 6.4 — Structural Validation of Learned Transition Dynamics
 """
 

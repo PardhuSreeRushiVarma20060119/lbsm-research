@@ -19,7 +19,7 @@ Key outputs for NB05
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 8.5 — Training Convergence & Behavioral Stabilisation
 """
 

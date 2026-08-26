@@ -20,7 +20,7 @@ Anomaly flag:   r_t > μ_r + k · σ_r   (k standard deviations above mean)
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 7.2 — Online Detection: EWMA Residual Scoring
 """
 

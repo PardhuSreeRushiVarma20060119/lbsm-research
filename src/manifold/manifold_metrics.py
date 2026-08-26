@@ -17,7 +17,7 @@ These metrics transform visual impressions into falsifiable claims:
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 5.4 — Quantitative Manifold Evaluation
 """
 

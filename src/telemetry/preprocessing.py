@@ -8,7 +8,7 @@ Handles clipping, missing values, type enforcement, and train/test split.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 4.1 — Data Preparation
 """
 

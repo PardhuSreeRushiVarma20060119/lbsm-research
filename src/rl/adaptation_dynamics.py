@@ -33,7 +33,7 @@ Key functions
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 8.6 — Latent Manifold Analysis of RL Adaptation
 """
 

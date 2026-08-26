@@ -8,7 +8,7 @@ Produces the per-regime and per-agent summaries used across notebooks.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 4.3 — Dataset Statistics
 """
 

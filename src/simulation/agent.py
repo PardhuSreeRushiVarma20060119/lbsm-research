@@ -18,7 +18,7 @@ The transition structure encodes domain knowledge:
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 3.2 — Agent Dynamics & Emission Model
 """
 

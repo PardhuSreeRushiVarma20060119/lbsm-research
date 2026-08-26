@@ -9,7 +9,7 @@ utilities.  All functions consume an ``HMMResult`` produced by
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 6.3 — Evaluation of Unsupervised Regime Recovery
 """
 

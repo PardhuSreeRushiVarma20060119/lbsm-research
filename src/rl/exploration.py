@@ -19,7 +19,7 @@ convergence speed.
 
 Reference
 ---------
-"Latent Behavioral State Machines: Manifold Geometry of Adaptive Agent Telemetry"
+"Latent Behavioral Structure in Low-Dimensional Statistical Manifolds"
 Section 8.3 — Exploration in Latent Behavioral Space
 """
 
