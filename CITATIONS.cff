@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+title: "Latent Behavioral Structure in Low-Dimensional Statistical Manifolds of Adaptive, Autonomous, Sequential Systems (LBSM): Unified Experimental Research Artifact"
+version: "v1.0.0"
+date-released: 2026-08-26
+
+authors:
+  - family-names: "Varma"
+    given-names: "Pardhu"
+
+type: software
+
+abstract: >
+  Unified experimental research artifact for the Latent Behavioral Structure
+  in Low-Dimensional Statistical Manifolds of Adaptive, Autonomous, Sequential
+  Systems (LBSM) research program, containing the experimental report,
+  research notebooks, source code, experimental outputs, figures, and
+  reproducibility materials corresponding to Notebooks 01–07.
+
+repository-code: "https://github.com/pardhuvarmax/lbsm-research"
+url: "https://doi.org/10.5281/zenodo.22108702"
+
+doi: "10.5281/zenodo.22108702"
+
+license: "MIT"
+
+keywords:
+  - "latent behavioral structure"
+  - "latent behavioral state machines"
+  - "low-dimensional statistical manifolds"
+  - "adaptive systems"
+  - "autonomous systems"
+  - "sequential systems"
+  - "machine learning"
+  - "behavioral dynamics"
+  - "manifold learning"
+  - "experimental research artifact"
+
+preferred-citation:
+  type: software
+  authors:
+    - family-names: "Varma"
+      given-names: "Pardhu"
+  title: "Latent Behavioral Structure in Low-Dimensional Statistical Manifolds of Adaptive, Autonomous, Sequential Systems (LBSM): Unified Experimental Research Artifact"
+  version: "v1.0.0"
+  year: 2026
+  doi: "10.5281/zenodo.22108702"
